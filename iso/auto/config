@@ -8,7 +8,6 @@ lb config noauto \
   --architectures amd64 \
   --binary-images iso-hybrid \
   --archive-areas "main non-free-firmware" \
-  --security false \
   --apt-recommends true \
   --debian-installer none \
   --memtest none \
