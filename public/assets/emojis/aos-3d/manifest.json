@@ -1,0 +1,24 @@
+{
+  "id": "aos-originals",
+  "name": "A-OS Originals",
+  "version": 1,
+  "license": "MIT",
+  "items": [
+    {"file": "emoji-00.png", "name": "A-OS Core", "symbol": "💠"},
+    {"file": "emoji-01.png", "name": "Quantum Bot", "symbol": "🤖"},
+    {"file": "emoji-02.png", "name": "Hyper Bolt", "symbol": "⚡"},
+    {"file": "emoji-03.png", "name": "Cyber Flame", "symbol": "🔥"},
+    {"file": "emoji-04.png", "name": "Crystal Shard", "symbol": "💎"},
+    {"file": "emoji-05.png", "name": "Super Launch", "symbol": "🚀"},
+    {"file": "emoji-06.png", "name": "Golden Star", "symbol": "⭐"},
+    {"file": "emoji-07.png", "name": "Sparkles Glow", "symbol": "✨"},
+    {"file": "emoji-08.png", "name": "Sovereign Crown", "symbol": "👑"},
+    {"file": "emoji-09.png", "name": "Cyber Shield", "symbol": "🛡️"},
+    {"file": "emoji-10.png", "name": "Kernel Shell", "symbol": "💻"},
+    {"file": "emoji-11.png", "name": "Quantum Chip", "symbol": "🔮"},
+    {"file": "emoji-12.png", "name": "Optical Array", "symbol": "💽"},
+    {"file": "emoji-13.png", "name": "Infinite Loop", "symbol": "♾️"},
+    {"file": "emoji-14.png", "name": "Grinning Face", "symbol": "😀"},
+    {"file": "emoji-15.png", "name": "Tears of Joy", "symbol": "😂"}
+  ]
+}

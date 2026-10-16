@@ -169,9 +169,55 @@
   function scanPage() {
     document.querySelectorAll("iframe").forEach(function (frame) {
       wireEmbedAlert(frame);
-      if (frame.title === "A-OS Weather Station") makeWeatherWidget(frame);
+      if (frame.title === "A-OS Weather Station") removeWeatherExternalLink(frame);
     });
+    decorateEmojiPack();
     removeAosPackageUpload();
+  }
+
+  function removeWeatherExternalLink(frame) {
+    var content = frame && frame.parentElement;
+    var widget = content && content.parentElement;
+    if (!widget) return;
+
+    widget.querySelectorAll('a[title="Open in new window"], a[target="_blank"][href*="a-os--weather"]')
+      .forEach(function (link) { link.remove(); });
+    widget.setAttribute("data-aos-weather-embed", "true");
+  }
+
+  var AOS_EMOJI_IMAGES = [
+    "emoji-00.png", "emoji-01.png", "emoji-02.png", "emoji-03.png",
+    "emoji-04.png", "emoji-05.png", "emoji-06.png", "emoji-07.png",
+    "emoji-08.png", "emoji-09.png", "emoji-10.png", "emoji-11.png",
+    "emoji-12.png", "emoji-13.png", "emoji-14.png", "emoji-15.png"
+  ];
+
+  function decorateEmojiPack() {
+    document.querySelectorAll(".emoji-pack-chip").forEach(function (chip) {
+      if (/A-OS 3D Neo/i.test(chip.textContent || "")) chip.textContent = "A-OS Originals";
+    });
+
+    var buttons = Array.from(document.querySelectorAll(".emoji-grid button.aos-3d-emoji"));
+    buttons.slice(0, AOS_EMOJI_IMAGES.length).forEach(function (button, index) {
+      var span = button.querySelector("span");
+      if (!span || span.querySelector("img")) return;
+      var fallback = span.textContent || "";
+      span.textContent = "";
+      var image = document.createElement("img");
+      image.src = "./assets/emojis/aos-3d/" + AOS_EMOJI_IMAGES[index] + "?v=managed11";
+      image.alt = fallback;
+      image.decoding = "async";
+      image.addEventListener("error", function () {
+        span.textContent = fallback;
+      }, {once: true});
+      span.appendChild(image);
+    });
+
+    document.querySelectorAll(".emoji-picker footer span:first-child").forEach(function (label) {
+      if (/A-OS Official Pack|A-OS 3D Neo/i.test(label.textContent || "")) {
+        label.textContent = "A-OS Originals";
+      }
+    });
   }
 
   function scheduleScan() {
@@ -205,6 +251,10 @@
   }
 
   function start() {
+    if (safeGet("aos-original-emoji-pack-version") !== "1") {
+      safeSet("aos-emoji-pack", "aos-3d");
+      safeSet("aos-original-emoji-pack-version", "1");
+    }
     scanPage();
     var observer = new MutationObserver(scheduleScan);
     observer.observe(document.documentElement, {childList: true, subtree: true});

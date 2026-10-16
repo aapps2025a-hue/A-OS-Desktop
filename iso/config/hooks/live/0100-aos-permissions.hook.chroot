@@ -1,0 +1,5 @@
+#!/bin/sh
+
+set -eu
+chmod 0755 /usr/local/lib/aos/server.py
+chmod 0755 /etc/skel/.xinitrc

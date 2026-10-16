@@ -23,6 +23,8 @@ browser security rules block parts of the module and storage system.
 Runtime assets live in these folders:
 
 - `public/assets/icons`
+- `public/assets/icons/aos-originals` (recovered editable vector designs)
+- `public/assets/emojis/aos-3d` (the active A-OS Originals emoji pack)
 - `public/assets/backgrounds`
 - `public/assets/media`
 - `public/assets/cursors`
@@ -47,6 +49,13 @@ firebase deploy --only hosting --project a-os-desktop
 GitHub Pages publishes automatically whenever the `main` branch is pushed.
 The Pages workflow prepares a copy of `public` with project-relative asset URLs;
 it does not modify the Firebase build.
+
+## Bootable ISO
+
+The open-source Debian Live configuration is in `iso`. GitHub Actions builds a
+real ISO-hybrid image that boots into Chromium and serves this exact `public`
+folder locally, including the same A-OS boot GIF. The generated ISO and SHA-256
+checksum are published in the `iso-v1.2.1-managed11` GitHub release.
 
 ## License
 

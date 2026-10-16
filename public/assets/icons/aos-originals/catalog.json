@@ -1,0 +1,201 @@
+{
+  "name": "A-OS original designed icons",
+  "icons": [
+    {
+      "legacyName": "os logo.png",
+      "file": "os logo.svg"
+    },
+    {
+      "legacyName": "internet.png",
+      "file": "internet.svg"
+    },
+    {
+      "legacyName": "files.png",
+      "file": "files.svg"
+    },
+    {
+      "legacyName": "downloads.png",
+      "file": "downloads.svg"
+    },
+    {
+      "legacyName": "code.png",
+      "file": "code.svg"
+    },
+    {
+      "legacyName": "text editor.png",
+      "file": "text editor.svg"
+    },
+    {
+      "legacyName": "settings.png",
+      "file": "settings.svg"
+    },
+    {
+      "legacyName": "terminal.png",
+      "file": "terminal.svg"
+    },
+    {
+      "legacyName": "this pc.png",
+      "file": "this pc.svg"
+    },
+    {
+      "legacyName": "pc.png",
+      "file": "pc.svg"
+    },
+    {
+      "legacyName": "clock.png",
+      "file": "clock.svg"
+    },
+    {
+      "legacyName": "calculator.png",
+      "file": "calculator.svg"
+    },
+    {
+      "legacyName": "weather.png",
+      "file": "weather.svg"
+    },
+    {
+      "legacyName": "camera.png",
+      "file": "camera.svg"
+    },
+    {
+      "legacyName": "image.png",
+      "file": "image.svg"
+    },
+    {
+      "legacyName": "images.png",
+      "file": "images.svg"
+    },
+    {
+      "legacyName": "record.png",
+      "file": "record.svg"
+    },
+    {
+      "legacyName": "trash.png",
+      "file": "trash.svg"
+    },
+    {
+      "legacyName": "security shield.png",
+      "file": "security shield.svg"
+    },
+    {
+      "legacyName": "security shield assistant.png",
+      "file": "security shield assistant.svg"
+    },
+    {
+      "legacyName": "safe.png",
+      "file": "safe.svg"
+    },
+    {
+      "legacyName": "media files.png",
+      "file": "media files.svg"
+    },
+    {
+      "legacyName": "music.png",
+      "file": "music.svg"
+    },
+    {
+      "legacyName": "video.png",
+      "file": "video.svg"
+    },
+    {
+      "legacyName": "notes.png",
+      "file": "notes.svg"
+    },
+    {
+      "legacyName": "draw.png",
+      "file": "draw.svg"
+    },
+    {
+      "legacyName": "bug.png",
+      "file": "bug.svg"
+    },
+    {
+      "legacyName": "bugged.png",
+      "file": "bugged.svg"
+    },
+    {
+      "legacyName": "zip.png",
+      "file": "zip.svg"
+    },
+    {
+      "legacyName": "reboot.png",
+      "file": "reboot.svg"
+    },
+    {
+      "legacyName": "shutdown.png",
+      "file": "shutdown.svg"
+    },
+    {
+      "legacyName": "success.png",
+      "file": "success.svg"
+    },
+    {
+      "legacyName": "tick.png",
+      "file": "tick.svg"
+    },
+    {
+      "legacyName": "cross.png",
+      "file": "cross.svg"
+    },
+    {
+      "legacyName": "error.png",
+      "file": "error.svg"
+    },
+    {
+      "legacyName": "arrow left.png",
+      "file": "arrow left.svg"
+    },
+    {
+      "legacyName": "arrow right.png",
+      "file": "arrow right.svg"
+    },
+    {
+      "legacyName": "arrow up.png",
+      "file": "arrow up.svg"
+    },
+    {
+      "legacyName": "profile.png",
+      "file": "profile.svg"
+    },
+    {
+      "legacyName": "38.png",
+      "file": "38.svg"
+    },
+    {
+      "legacyName": "less.png",
+      "file": "less.svg"
+    },
+    {
+      "legacyName": "more.png",
+      "file": "more.svg"
+    },
+    {
+      "legacyName": "company.png",
+      "file": "company.svg"
+    },
+    {
+      "legacyName": "lucky.png",
+      "file": "lucky.svg"
+    },
+    {
+      "legacyName": "money.png",
+      "file": "money.svg"
+    },
+    {
+      "legacyName": "star.png",
+      "file": "star.svg"
+    },
+    {
+      "legacyName": "search.png",
+      "file": "search.svg"
+    },
+    {
+      "legacyName": "cloud.png",
+      "file": "cloud.svg"
+    },
+    {
+      "legacyName": "ai services (hidden app).png",
+      "file": "ai services (hidden app).svg"
+    }
+  ]
+}

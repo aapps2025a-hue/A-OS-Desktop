@@ -260,6 +260,18 @@ input[type="file"][accept*=".aos" i] {
   line-height: 1 !important;
 }
 
+.emoji-grid .aos-3d-emoji img {
+  display: block;
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+[data-aos-weather-embed="true"] a[title="Open in new window"] {
+  display: none !important;
+}
+
 .emoji-grid img,
 .emoji-grid img.emoji {
   width: 30px !important;
