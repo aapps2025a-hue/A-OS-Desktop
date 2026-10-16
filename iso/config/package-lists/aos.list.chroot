@@ -3,6 +3,7 @@ live-config
 systemd-sysv
 linux-image-amd64
 xserver-xorg
+xserver-xorg-legacy
 xinit
 openbox
 chromium

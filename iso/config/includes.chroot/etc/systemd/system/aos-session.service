@@ -1,0 +1,14 @@
+[Unit]
+Description=A-OS Desktop kiosk session
+After=systemd-user-sessions.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/aos/start-session.sh
+Restart=always
+RestartSec=2
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target
