@@ -3,11 +3,16 @@
 A-OS Desktop is the best OS for computers you have ever used. It is web-based,
 like a web OS for computers, and built to be better.
 
-A-OS Desktop is a browser-based computer interface with local files, apps,
+A-OS Desktop is a html-based computer interface with local files, apps,
 widgets, account profiles, device sharing, security tools, and a customizable
-desktop. This repository contains the same static build used by the Firebase
-Hosting release.
+desktop. 
 
+<img width="782" height="440" alt="image" src="https://github.com/user-attachments/assets/b94cf876-c5e7-46c0-9d2a-415f75e289e3" />
+
+## New Stuff
+
+We have added some new options and fixed patches in V3.1. As well as
+making it a better experience and making a `.iso`
 ## Run locally
 
 Serve the `public` folder with any static web server. For example:
