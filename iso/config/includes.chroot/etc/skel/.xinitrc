@@ -12,6 +12,8 @@ until curl --silent --fail http://127.0.0.1:5000/ >/dev/null; do
   sleep 0.25
 done
 
+echo "AOS_BOOT_READY" >/dev/ttyS0 2>/dev/null || true
+
 while true; do
   chromium \
     --kiosk \

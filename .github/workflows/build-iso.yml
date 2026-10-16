@@ -27,7 +27,7 @@ jobs:
       - name: Install Debian Live tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ca-certificates cpio debootstrap debian-archive-keyring dosfstools grub-efi-amd64-bin grub-pc-bin isolinux mtools rsync squashfs-tools syslinux-common wget xorriso xz-utils
+          sudo apt-get install -y ca-certificates cpio debootstrap debian-archive-keyring dosfstools grub-efi-amd64-bin grub-pc-bin isolinux mtools qemu-system-x86 rsync squashfs-tools syslinux-common wget xorriso xz-utils
           wget -qO /tmp/live-build.deb https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           echo "58e09779881cbcc631c49ceb703413e0247a87db01823e597b2a1c40a2afd8f4  /tmp/live-build.deb" | sha256sum -c -
           sudo dpkg -i /tmp/live-build.deb
@@ -46,6 +46,34 @@ jobs:
           sudo lb build
           sudo mv live-image-amd64.hybrid.iso ../A-OS-Desktop-amd64.iso
           sudo chown "$USER:$USER" ../A-OS-Desktop-amd64.iso
+
+      - name: Boot-test A-OS HTML in QEMU
+        run: |
+          rm -f /tmp/aos-serial.log
+          qemu-system-x86_64 \
+            -machine accel=tcg \
+            -m 3072 \
+            -cdrom A-OS-Desktop-amd64.iso \
+            -boot d \
+            -display none \
+            -serial file:/tmp/aos-serial.log \
+            -no-reboot &
+          qemu_pid=$!
+          trap 'kill "$qemu_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 150); do
+            if grep -q "AOS_BOOT_READY" /tmp/aos-serial.log 2>/dev/null; then
+              echo "A-OS reached its local HTML server after boot."
+              exit 0
+            fi
+            if ! kill -0 "$qemu_pid" 2>/dev/null; then
+              cat /tmp/aos-serial.log
+              exit 1
+            fi
+            sleep 2
+          done
+          cat /tmp/aos-serial.log
+          echo "A-OS did not reach the HTML server within five minutes." >&2
+          exit 1
 
       - name: Create checksum
         run: sha256sum A-OS-Desktop-amd64.iso > A-OS-Desktop-amd64.iso.sha256
