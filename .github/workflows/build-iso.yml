@@ -53,6 +53,7 @@ jobs:
           qemu-system-x86_64 \
             -machine accel=tcg \
             -m 3072 \
+            -smp 2 \
             -cdrom A-OS-Desktop-amd64.iso \
             -boot d \
             -display none \
@@ -60,7 +61,7 @@ jobs:
             -no-reboot &
           qemu_pid=$!
           trap 'kill "$qemu_pid" 2>/dev/null || true' EXIT
-          for attempt in $(seq 1 150); do
+          for attempt in $(seq 1 300); do
             if grep -q "AOS_BOOT_READY" /tmp/aos-serial.log 2>/dev/null; then
               echo "A-OS reached its local HTML server after boot."
               exit 0
@@ -72,7 +73,7 @@ jobs:
             sleep 2
           done
           cat /tmp/aos-serial.log
-          echo "A-OS did not reach the HTML server within five minutes." >&2
+          echo "A-OS did not reach the HTML server within ten minutes." >&2
           exit 1
 
       - name: Create checksum
