@@ -1,0 +1,27 @@
+    █████╗            ██████╗ ███████╗
+   ██╔══██╗          ██╔═══██╗██╔════╝
+   ███████║  █████╗██║   ██║███████╗
+   ██╔══██║  ╚════╝██║   ██║╚════██║
+   ██║  ██║          ╚██████╔╝███████║
+   ╚═╝  ╚═╝           ╚═════╝ ╚══════╝
+   >> Ecosystem Initialized Successfully <<
+------------------------------------------------
+[*] Initializing A-OS core components...
+Checking kernel compatibility... [OK]
+Loading secure environment variables... [OK]
+Syncing local repositories... [DONE]
+------------------------------------------------
+Welcome back, Operator: admin@aos-terminal
+
+A-OS has been deployed natively on your hardware.
+Your command line interface is primed and ready for optimization.
+
+=== SYSTEM DASHBOARD ===
+  OS Version:     A-OS v1.0.0-Stable
+  Shell Env:      /bin/bash
+  Uptime:         up 2 minutes
+  Storage Status: 12% used
+========================
+
+[!] Action required: Type 'help' or 'aos-config' to configure your workspace.
+System is online. Elevating privileges to user. Bash away.

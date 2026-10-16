@@ -1,0 +1,300 @@
+:root {
+  --aos-ui-font: "TT Norms Pro", "TT Norms", Inter, "Segoe UI", Arial, sans-serif;
+  --aos-weather-bg: rgba(248, 250, 252, 0.96);
+  --aos-weather-panel: rgba(226, 232, 240, 0.72);
+  --aos-weather-border: rgba(100, 116, 139, 0.24);
+  --aos-weather-text: #172033;
+  --aos-weather-muted: #64748b;
+  --aos-weather-accent: #126fc9;
+}
+
+html,
+body,
+button,
+input,
+textarea,
+select {
+  font-family: var(--aos-ui-font);
+  letter-spacing: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --aos-weather-bg: rgba(15, 23, 42, 0.96);
+    --aos-weather-panel: rgba(30, 41, 59, 0.88);
+    --aos-weather-border: rgba(148, 163, 184, 0.2);
+    --aos-weather-text: #f1f5f9;
+    --aos-weather-muted: #a8b5c8;
+    --aos-weather-accent: #5eb8ff;
+  }
+}
+
+.desktop.dark-mode .aos-weather-native {
+  --aos-weather-bg: rgba(15, 23, 42, 0.96);
+  --aos-weather-panel: rgba(30, 41, 59, 0.88);
+  --aos-weather-border: rgba(148, 163, 184, 0.2);
+  --aos-weather-text: #f1f5f9;
+  --aos-weather-muted: #a8b5c8;
+  --aos-weather-accent: #5eb8ff;
+}
+
+.aos-weather-native {
+  width: min(100%, 320px);
+  min-width: 220px;
+  overflow: hidden;
+  border: 1px solid var(--aos-weather-border);
+  border-radius: 8px;
+  background: var(--aos-weather-bg);
+  color: var(--aos-weather-text);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
+  font-family: var(--aos-ui-font);
+}
+
+.aos-weather-header {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--aos-weather-border);
+}
+
+.aos-weather-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.aos-weather-title img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.aos-weather-refresh {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--aos-weather-border);
+  border-radius: 6px;
+  background: var(--aos-weather-panel);
+  color: var(--aos-weather-text);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.aos-weather-refresh:hover,
+.aos-weather-refresh:focus-visible {
+  border-color: var(--aos-weather-accent);
+  color: var(--aos-weather-accent);
+  outline: none;
+}
+
+.aos-weather-refresh:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.aos-weather-body {
+  min-height: 154px;
+  padding: 14px;
+}
+
+.aos-weather-primary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aos-weather-temperature {
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 750;
+}
+
+.aos-weather-condition {
+  max-width: 135px;
+  color: var(--aos-weather-muted);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: right;
+}
+
+.aos-weather-place {
+  margin-top: 6px;
+  color: var(--aos-weather-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.aos-weather-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.aos-weather-details > span {
+  min-width: 0;
+  padding: 7px;
+  border-radius: 6px;
+  background: var(--aos-weather-panel);
+}
+
+.aos-weather-details small,
+.aos-weather-details b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aos-weather-details small {
+  color: var(--aos-weather-muted);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.aos-weather-details b {
+  margin-top: 2px;
+  color: var(--aos-weather-text);
+  font-size: 11px;
+}
+
+input[type="file"][accept*=".aos" i] {
+  display: none !important;
+}
+
+.emoji-picker {
+  width: min(410px, calc(100vw - 24px)) !important;
+  max-width: 410px !important;
+  height: min(520px, calc(100vh - 24px)) !important;
+  max-height: 520px !important;
+  top: 12px !important;
+  border-radius: 8px !important;
+  font-family: var(--aos-ui-font) !important;
+  z-index: 1000001 !important;
+}
+
+.emoji-picker > header {
+  min-height: 44px !important;
+  padding: 9px 12px !important;
+}
+
+.emoji-picker > header b {
+  font-size: 13px !important;
+}
+
+.emoji-picker .close-btn {
+  width: 30px !important;
+  height: 30px !important;
+  font-size: 20px !important;
+}
+
+.emoji-tabs {
+  height: 40px !important;
+  max-height: 40px !important;
+  min-height: 38px !important;
+  gap: 6px !important;
+  padding: 5px 8px !important;
+  overflow: hidden !important;
+}
+
+.emoji-tab-btn {
+  height: 30px !important;
+  min-height: 30px !important;
+  aspect-ratio: auto !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+.emoji-pack-bar {
+  gap: 5px !important;
+  padding: 6px 8px !important;
+  overflow-x: auto !important;
+}
+
+.emoji-pack-chip {
+  min-height: 28px !important;
+  padding: 4px 9px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  white-space: nowrap !important;
+}
+
+.emoji-search {
+  min-height: 38px !important;
+  margin: 7px 9px !important;
+  padding: 8px 10px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+}
+
+.emoji-grid {
+  grid-template-columns: repeat(7, minmax(0, 1fr)) !important;
+  gap: 5px !important;
+  padding: 8px 10px 12px !important;
+}
+
+.emoji-grid > button {
+  width: 100% !important;
+  aspect-ratio: 1 !important;
+  min-height: 44px !important;
+  border-radius: 6px !important;
+}
+
+.emoji-grid > button > span,
+.emoji-grid .aos-3d-emoji > span {
+  display: grid !important;
+  width: 100% !important;
+  height: 100% !important;
+  place-items: center !important;
+  font-size: 28px !important;
+  line-height: 1 !important;
+}
+
+.emoji-grid img,
+.emoji-grid img.emoji {
+  width: 30px !important;
+  height: 30px !important;
+  margin: 0 !important;
+  object-fit: contain !important;
+}
+
+.clipboard-list {
+  padding: 8px 10px 12px !important;
+  gap: 7px !important;
+}
+
+.clipboard-card {
+  min-height: 66px !important;
+  padding: 9px 10px !important;
+  border-radius: 7px !important;
+}
+
+.emoji-picker footer {
+  min-height: 32px !important;
+  padding: 7px 10px !important;
+  font-size: 10px !important;
+}
+
+@media (max-width: 460px) {
+  .emoji-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  .emoji-grid > button {
+    min-height: 40px !important;
+  }
+
+  .aos-weather-native {
+    min-width: 200px;
+  }
+}

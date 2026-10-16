@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Custom Cursor Demo (Clicks Disabled)</title>
+  <style>
+    :root {
+      --cursor-base: url("https://uploads.onecompiler.io/448ndwdwy/1788072555248/grey-arrow.svg");
+    }
+
+    /* Prevent text selection */
+    body {
+      margin: 0;
+      padding: 2rem;
+      font-family: system-ui, sans-serif;
+      cursor: var(--cursor-base) 0 0, auto;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+
+    .text-area {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%23888888" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" transform="rotate(-90 12 12)"/></svg>') 0 12, text;
+    }
+
+    .grab-box {
+      margin-top: 1.5rem;
+      padding: 2rem;
+      background: #f0f0f0;
+      border: 2px dashed #888;
+      text-align: center;
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path fill="%23888888" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" transform="rotate(90 12 12)"/></svg>') 12 12, grab;
+    }
+
+    .big-pointer-zone {
+      margin-top: 1.5rem;
+      padding: 2rem;
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      text-align: center;
+      cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"><path fill="%23888888" d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>') 0 0, auto;
+    }
+  </style>
+</head>
+<body>
+
+
+
+  <script>
+    // Prevent the default context menu from opening on right-click
+    document.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+
+    // Block left-click events
+    document.addEventListener('click', function (e) {
+      if (e.button === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+
+    // Block mousedown events for all mouse buttons
+    document.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
+  </script>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-OS</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #0078d7;
+            color: #ffffff;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .update-container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+        }
+
+        .spinner-container {
+            margin-bottom: 50px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #e6f2ff;
+            box-shadow: 0 0 25px 8px rgba(230, 242, 255, 0.5),
+                        0 0 50px 20px rgba(230, 242, 255, 0.25);
+            animation: pulseCircle 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseCircle {
+            0% {
+                transform: scale(0.8);
+                box-shadow: 0 0 20px 5px rgba(230, 242, 255, 0.4),
+                            0 0 40px 15px rgba(230, 242, 255, 0.2);
+            }
+
+            50% {
+                transform: scale(1.2);
+                box-shadow: 0 0 35px 12px rgba(230, 242, 255, 0.7),
+                            0 0 70px 30px rgba(230, 242, 255, 0.4);
+            }
+
+            100% {
+                transform: scale(0.8);
+                box-shadow: 0 0 20px 5px rgba(230, 242, 255, 0.4),
+                            0 0 40px 15px rgba(230, 242, 255, 0.2);
+            }
+        }
+
+        h1 {
+            font-weight: 300;
+            font-size: 2.2rem;
+            margin-bottom: 15px;
+            letter-spacing: 0.5px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 300;
+        }
+
+        .status-text {
+            margin-top: 15px;
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.65);
+            min-height: 22px;
+        }
+    </style>
+</head>
+<body>
+    <div class="update-container">
+        <div class="spinner-container">
+            <div class="spinner"></div>
+        </div>
+
+        <h1>Installing A-OS. <span id="percentage">0%</span> complete</h1>
+        <p>Don't turn off your Personal Computer. This will still take a few minutes.</p>
+        <div class="status-text" id="status-phase">Initializing installation environment...</div>
+    </div>
+
+    <script>
+        const TARGET_URL = "os.html";
+        const percentageEl = document.getElementById("percentage");
+        const statusEl = document.getElementById("status-phase");
+
+        const updatePhases = [
+            { threshold: 15, text: "Preparing installation packages..." },
+            { threshold: 40, text: "Ready for A-OS. Installing BIOS Package..." },
+            { threshold: 60, text: "BIOS Software change was successful. Installing A-OS..." },
+            { threshold: 75, text: "A-OS apps and system management are being installed..." },
+            { threshold: 90, text: "Done installing A-OS. Preparing your Personal Computer..." },
+            { threshold: 99, text: "Cleaning up unnecessary datalogs..." }
+        ];
+
+        // Random duration between 60 and 90 seconds.
+        const installationDuration = Math.floor(Math.random() * 30001) + 60000;
+        let startTime;
+
+        function updateInstallation() {
+            const elapsedTime = Date.now() - startTime;
+            const progress = Math.min(elapsedTime / installationDuration, 1);
+            const currentPercentage = Math.floor(progress * 100);
+
+            percentageEl.textContent = currentPercentage + "%";
+
+            const currentPhase = updatePhases.find(
+                phase => currentPercentage <= phase.threshold
+            );
+
+            if (currentPhase) {
+                statusEl.textContent = currentPhase.text;
+            }
+
+            if (progress >= 1) {
+                percentageEl.textContent = "100%";
+                statusEl.textContent = "Restarting...";
+
+                setTimeout(() => {
+                    window.location.href = TARGET_URL;
+                }, 1200);
+
+                return;
+            }
+
+            setTimeout(updateInstallation, 250);
+        }
+
+        window.onload = () => {
+            setTimeout(() => {
+                startTime = Date.now();
+                updateInstallation();
+            }, 1500);
+        };
+    </script>
+</body>
+</html>

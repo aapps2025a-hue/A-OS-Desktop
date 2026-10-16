@@ -1,0 +1,14 @@
+{
+  "name": "A-OS 1.2.1 — A-OS Computer",
+  "short_name": "A-OS 1.2.1",
+  "description": "A modern computer with A-Applications sync, Camera, video playback, OSInternet and original 3D emoji.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030711",
+  "theme_color": "#071733",
+  "icons": [
+    {"src":"/assets/icons/OS Logo.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

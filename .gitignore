@@ -1,0 +1,17 @@
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+node_modules/
+_site/
+.DS_Store
+Thumbs.db
+*.lnk
+*.local
+.env
+.env.*
+!.env.example
+
+# Kept in the local/Firebase build, but not redistributed by this repository.
+public/assets/icons/s9_over_the_horizon.mp3
+public/assets/media/s9_over_the_horizon.mp3
+

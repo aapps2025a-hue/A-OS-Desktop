@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>
+// If setup was already completed, always open A-OS instead.
+try {
+  if (localStorage.getItem("aosInstallationFinished") === "true") {
+    window.location.replace("os.html");
+  }
+} catch (error) {
+  console.warn("Could not read installation state:", error);
+}
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Setup</title>
+<style>* {
+box-sizing: border-box;
+}
+
+:root {
+color-scheme: light;
+font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+color: #202020;
+background: #e7edf4;
+}
+
+body {
+min-height: 100vh;
+margin: 0;
+padding: 30px 18px;
+display: flex;
+align-items: center;
+justify-content: center;
+background:
+radial-gradient(circle at 50% 10%, rgba(255, 255, 255, .95), transparent 42%),
+linear-gradient(135deg, #d8e4ef, #f5f8fb 48%, #c8d9e9);
+}
+
+button,
+input {
+font: inherit;
+}
+
+.installer-window {
+position: relative;
+width: min(980px, 100%);
+min-height: 650px;
+overflow: hidden;
+border: 1px solid #365c80;
+border-radius: 8px;
+background: #f7f8fa;
+box-shadow: 0 12px 35px rgba(18, 52, 82, .38), inset 0 1px #fff;
+}
+
+.top-bar {
+height: 58px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 0 12px 0 16px;
+color: #fff;
+background: linear-gradient(#75b8ed 0%, #2a79be 48%, #155a9c 52%, #2475b4 100%);
+border-bottom: 1px solid #174b77;
+text-shadow: 0 1px 2px #17466d;
+cursor: move;
+user-select: none;
+}
+
+.brand {
+display: flex;
+align-items: center;
+gap: 10px;
+}
+
+.brand-mark,
+.heading-icon,
+.complete-icon {
+display: grid;
+place-items: center;
+border-radius: 4px;
+font-weight: bold;
+letter-spacing: -1px;
+}
+
+.brand-mark {
+width: 35px;
+height: 35px;
+font-size: 14px;
+color: #154d7c;
+background: linear-gradient(#fff, #c8e7ff);
+border: 1px solid #d9f2ff;
+box-shadow: 0 0 8px rgba(255, 255, 255, .7);
+text-shadow: none;
+}
+
+.brand h1,
+.brand p {
+margin: 0;
+}
+
+.brand h1 {
+font-size: 18px;
+font-weight: 400;
+}
+
+.brand p {
+margin-top: 2px;
+font-size: 11px;
+color: #d9edff;
+}
+
+.window-controls {
+display: flex;
+gap: 4px;
+align-self: flex-start;
+margin-top: 6px;
+cursor: default;
+}
+
+.window-controls button {
+width: 25px;
+height: 20px;
+padding: 0;
+color: #fff;
+border: 1px solid rgba(255, 255, 255, .65);
+border-radius: 3px;
+background: rgba(18, 78, 132, .35);
+cursor: pointer;
+}
+
+.window-controls button:hover {
+background: rgba(255, 255, 255, .25);
+}
+
+.content {
+display: flex;
+min-height: 500px;
+}
+
+.sidebar {
+position: relative;
+width: 235px;
+padding: 27px 19px;
+color: #fff;
+background: linear-gradient(90deg, #286da4, #4b91c4);
+border-right: 1px solid #729fbe;
+text-shadow: 0 1px 2px #1b4c70;
+}
+
+.side-title {
+margin-bottom: 25px;
+font-size: 15px;
+font-weight: 600;
+}
+
+.steps {
+display: grid;
+gap: 20px;
+padding: 0;
+margin: 0;
+list-style: none;
+}
+
+.steps li {
+display: flex;
+align-items: center;
+gap: 11px;
+color: #c5dff1;
+font-size: 13px;
+}
+
+.steps li span {
+display: grid;
+place-items: center;
+width: 25px;
+height: 25px;
+border: 1px solid #acd1e8;
+border-radius: 50%;
+color: #eaf7ff;
+background: rgba(19, 81, 127, .4);
+}
+
+.steps li.active {
+color: #fff;
+font-weight: bold;
+}
+
+.steps li.active span {
+color: #1a5b91;
+background: linear-gradient(#fff, #bde3fb);
+border-color: #fff;
+box-shadow: 0 0 7px rgba(255, 255, 255, .7);
+text-shadow: none;
+}
+
+.sidebar-footer {
+position: absolute;
+bottom: 23px;
+left: 19px;
+color: #d4e9f7;
+font-size: 12px;
+}
+
+.sidebar-footer p {
+margin: 4px 0;
+}
+
+.version {
+font-size: 11px;
+opacity: .8;
+}
+
+.main-panel {
+flex: 1;
+padding: 34px 43px;
+background: linear-gradient(90deg, #fff, #fafbfd);
+}
+
+.page-heading {
+display: flex;
+align-items: center;
+gap: 15px;
+margin-bottom: 28px;
+}
+
+.page-heading h2 {
+margin: 0 0 5px;
+color: #234c6f;
+font-size: 24px;
+font-weight: 400;
+}
+
+.page-heading p {
+margin: 0;
+color: #666;
+font-size: 13px;
+}
+
+.heading-icon {
+width: 52px;
+height: 52px;
+color: #236292;
+background: linear-gradient(#f8fdff, #bfdef1);
+border: 1px solid #7ea9c6;
+box-shadow: inset 0 1px #fff;
+font-size: 13px;
+}
+
+.info-box {
+padding: 16px 19px;
+margin-bottom: 24px;
+border: 1px solid #b7d2e4;
+border-radius: 3px;
+background: linear-gradient(90deg, #edf8ff, #f9fcff);
+color: #35556e;
+font-size: 13px;
+}
+
+.info-box strong {
+display: block;
+margin-bottom: 7px;
+color: #234c6f;
+}
+
+.info-box p,
+.body-text {
+line-height: 1.6;
+}
+
+.info-box p {
+margin: 0;
+}
+
+.body-text {
+max-width: 650px;
+color: #424242;
+font-size: 13px;
+}
+
+.system-details {
+max-width: 620px;
+margin-top: 28px;
+border-top: 1px solid #d4dce2;
+}
+
+.system-details div {
+display: flex;
+justify-content: space-between;
+padding: 11px 5px;
+border-bottom: 1px solid #d4dce2;
+color: #666;
+font-size: 13px;
+}
+
+.system-details strong {
+color: #333;
+font-weight: 400;
+}
+
+.license-box,
+.install-log {
+height: 250px;
+overflow-y: auto;
+padding: 17px;
+border: 1px solid #aab7c2;
+border-radius: 2px;
+background: #fff;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, .1);
+color: #3f3f3f;
+font-size: 12px;
+line-height: 1.6;
+}
+
+.license-box h3 {
+margin-top: 0;
+color: #234c6f;
+font-size: 14px;
+}
+
+.check-row {
+display: flex;
+gap: 8px;
+align-items: center;
+margin-top: 17px;
+color: #333;
+font-size: 13px;
+}
+
+.check-row input {
+width: 15px;
+height: 15px;
+accent-color: #2678b8;
+}
+
+.install-options {
+display: grid;
+gap: 12px;
+}
+
+.install-option {
+display: flex;
+gap: 12px;
+align-items: flex-start;
+padding: 15px;
+border: 1px solid #c5d1da;
+border-radius: 3px;
+background: linear-gradient(#fff, #f4f8fb);
+cursor: pointer;
+}
+
+.install-option.selected,
+.install-option:has(input:checked) {
+border-color: #6ea6ce;
+background: #edf7ff;
+box-shadow: inset 0 0 0 1px #d8efff;
+}
+
+.install-option input {
+display: none;
+}
+
+.radio-fake {
+flex: 0 0 auto;
+width: 16px;
+height: 16px;
+border: 1px solid #7893a7;
+border-radius: 50%;
+background: #fff;
+}
+
+.install-option input:checked + .radio-fake {
+border: 4px solid #2779b7;
+}
+
+.install-option strong,
+.install-option small {
+display: block;
+}
+
+.install-option strong {
+margin-bottom: 5px;
+color: #244e70;
+font-size: 14px;
+}
+
+.install-option small {
+color: #666;
+font-size: 12px;
+line-height: 1.4;
+}
+
+.drive-list {
+margin-top: 26px;
+border: 1px solid #c5d1da;
+}
+
+.drive-header {
+padding: 8px 11px;
+color: #345975;
+background: #eaf1f6;
+border-bottom: 1px solid #c5d1da;
+font-size: 12px;
+font-weight: bold;
+}
+
+.drive {
+display: flex;
+align-items: center;
+gap: 12px;
+padding: 13px;
+font-size: 12px;
+}
+
+.drive-icon {
+display: grid;
+place-items: center;
+width: 34px;
+height: 27px;
+color: #fff;
+background: #4c94c5;
+font-size: 10px;
+font-weight: bold;
+}
+
+.drive div {
+flex: 1;
+}
+
+.drive strong,
+.drive small {
+display: block;
+}
+
+.drive small {
+margin-top: 3px;
+color: #777;
+}
+
+.drive b {
+color: #555;
+font-weight: 400;
+}
+
+.installation-status {
+padding: 20px;
+border: 1px solid #bfd1df;
+border-radius: 3px;
+background: #f4f9fc;
+}
+
+.status-line {
+display: flex;
+justify-content: space-between;
+margin-bottom: 12px;
+color: #315875;
+font-size: 13px;
+}
+
+.progress-track {
+height: 23px;
+overflow: hidden;
+padding: 3px;
+border: 1px solid #8aa9bf;
+border-radius: 4px;
+background: #d9e5ec;
+box-shadow: inset 0 1px 3px rgba(0, 0, 0, .2);
+}
+
+.progress-fill {
+width: 0;
+height: 100%;
+border-radius: 2px;
+background: linear-gradient(#8fd2fa 0%, #2792d2 45%, #176da7 55%, #4eaae0);
+transition: width .2s linear;
+}
+
+.installation-status p {
+margin: 12px 0 0;
+color: #666;
+font-size: 12px;
+}
+
+.install-log {
+height: 105px;
+margin-top: 17px;
+color: #486274;
+background: #f8fbfd;
+font-family: Consolas, monospace;
+font-size: 11px;
+}
+
+.complete-page {
+padding-top: 50px;
+text-align: center;
+}
+
+.complete-icon {
+width: 75px;
+height: 75px;
+margin: 0 auto 23px;
+color: #fff;
+border: 1px solid #1d6394;
+border-radius: 50%;
+background: linear-gradient(#70b8e8, #17669f);
+box-shadow: 0 2px 5px rgba(0, 0, 0, .2);
+font-size: 19px;
+}
+
+.complete-page h2 {
+margin: 0 0 12px;
+color: #234c6f;
+font-size: 25px;
+font-weight: 400;
+}
+
+.complete-page p {
+color: #444;
+font-size: 14px;
+}
+
+.complete-page .muted {
+margin-top: 24px;
+color: #777;
+font-size: 12px;
+}
+
+.bottom-bar {
+display: flex;
+align-items: center;
+justify-content: space-between;
+min-height: 67px;
+padding: 0 22px 0 24px;
+border-top: 1px solid #b9c5ce;
+background: linear-gradient(#f6f8fa, #dfe6eb);
+}
+
+.footer-info {
+display: flex;
+gap: 18px;
+color: #71808b;
+font-size: 11px;
+}
+
+.actions {
+display: flex;
+gap: 9px;
+}
+
+.button {
+min-width: 85px;
+padding: 7px 17px;
+border: 1px solid #7892a5;
+border-radius: 3px;
+color: #234660;
+background: linear-gradient(#fff, #d9e3ea);
+box-shadow: inset 0 1px #fff;
+cursor: pointer;
+font-size: 13px;
+}
+
+.button:hover:not(:disabled) {
+border-color: #397eae;
+background: linear-gradient(#fff, #c6e7fa);
+}
+
+.button:disabled {
+color: #9ba5aa;
+cursor: not-allowed;
+opacity: .7;
+}
+
+.button.primary {
+color: #fff;
+border-color: #1b6092;
+background: linear-gradient(#74b9e7, #2475b2 52%, #15598c);
+text-shadow: 0 1px 1px #25577a;
+}
+
+.hidden {
+display: none !important;
+}
+
+.installer-window.minimized .content,
+.installer-window.minimized .bottom-bar {
+display: none;
+}
+
+.installer-window.minimized {
+min-height: 0;
+}
+
+.installer-window.closed {
+display: none;
+}
+
+@media (max-width: 700px) {
+body {
+padding: 0;
+}
+
+.installer-window {
+min-height: 100vh;
+border: 0;
+border-radius: 0;
+}
+
+.sidebar {
+display: none;
+}
+
+.main-panel {
+padding: 28px 20px;
+}
+
+.content {
+min-height: calc(100vh - 125px);
+}
+
+.bottom-bar {
+padding: 12px 15px;
+}
+}</style>
+<style>.glow-rounded-icon {
+/* Dynamic rounding based on size */
+border-radius: 15%;
+
+/* Creates a smooth, composite neon glow */
+filter: drop-shadow(0 0 8px rgba(0, 102, 204, 0.6))
+drop-shadow(0 0 15px rgba(0, 153, 255, 0.4));
+
+/* Ensures background shapes clip nicely */
+overflow: hidden;
+}
+</style>
+</head>
+<body>
+<main class="installer-window">
+<header class="top-bar">
+<div class="brand">
+
+<img
+src="https://uploads.onecompiler.io/448ndwdwy/1788036118976/Untitled%20design%20(2).png"
+class="glow-rounded-icon"
+alt="Glow Icon"
+
+/>
+
+<div>
+<h1>A-OS Setup/Installation</h1>
+
+</div>
+</div>
+<div class="window-controls">
+<button aria-label="Minimize">_</button>
+<button aria-label="Close">X</button>
+</div>
+</header>
+
+<section class="content">
+<aside class="sidebar">
+<div class="side-title">Setup Progress</div>
+<ol class="steps">
+<li class="active" data-step="1">
+<span>1</span>
+<div>Welcome</div>
+</li>
+<li data-step="2">
+<span>2</span>
+<div>Terms of info Agreement</div>
+</li>
+<li data-step="3">
+<span>3</span>
+<div>Installation Type</div>
+</li>
+<li data-step="4">
+<span>4</span>
+<div>Installing</div>
+</li>
+<li data-step="5">
+<span>5</span>
+<div>Complete</div>
+</li>
+</ol>
+<div class="sidebar-footer">
+<p>System Setup</p>
+<p class="version">A-OS latest installer</p>
+</div>
+</aside>
+
+<section class="main-panel">
+<div class="page" data-page="1">
+<div class="page-heading">
+<div class="heading-icon">OS</div>
+<div>
+<h2>A-OS Installation</h2>
+<p>Setup will guide you through the installation of your operating system. This will crash non .aos supported devices, all A-OS devices are supported.</p>
+</div>
+</div>
+
+<div class="info-box">
+<strong>Before you begin</strong>
+<p>Make sure your computer is connected to power and that you have backed up important files. This Installation has 95% of success. Do not do this on non A-OS devices.</p>
+</div>
+
+<p class="body-text">
+A-OS Installer is official, Ready to go.
+The installation may take several minutes.
+</p>
+
+<div class="system-details">
+<div><span>Processor</span><strong>Unknown Compatible Processor</strong></div>
+<div><span>Memory</span><strong>More than 4 GB RAM</strong></div>
+<div><span>Storage</span><strong>More than 2 GB available space</strong></div>
+</div>
+</div>
+
+<div class="page hidden" data-page="2">
+<div class="page-heading">
+<div class="heading-icon">ⓘ</div>
+<div>
+<h2>Use of info agreement</h2>
+<p>Please review the terms before continuing.</p>
+</div>
+</div>
+
+<div class="license-box">
+<h3>A-OS Terms of info</h3>
+<p>Some of youre files and agreements will be saved in SQL documents when sign in to A-Applications(Not Required)</p>
+<p>Some files are based on the languages of HTML, PYTHON, JAVA, JAVASCRIPT, CSS. Please accept our coding.</p>
+<p>This software is provided as-is. The publisher is not responsible for data loss or damage resulting from its use.</p>
+<p>2026 A-OS</p>
+</div>
+
+<label class="check-row">
+<input type="checkbox" id="agree">
+<span>I accept how data/info is handled.</span>
+</label>
+</div>
+
+<div class="page hidden" data-page="3">
+<div class="page-heading">
+<div class="heading-icon">IT</div>
+<div>
+<h2>Choose an installation type</h2>
+<p>Select how you want to install the operating system.</p>
+</div>
+</div>
+
+<div class="install-options">
+<label class="install-option selected">
+<input type="radio" name="installType" checked>
+<span class="radio-fake"></span>
+<span>
+<strong>.aos for custom ROM</strong>
+<small>Install a clean copy of the operating system. But will not say it is official.</small>
+</span>
+</label>
+
+<label class="install-option">
+<input type="radio" name="installType">
+<span class="radio-fake"></span>
+<span>
+<strong>Default A-OS</strong>
+<small>Install A-OS as a factory came OS, device will recognise it.</small>
+</span>
+</label>
+</div>
+
+<div class="drive-list">
+<div class="drive-header">Where we will install the os:</div>
+<div class="drive selected-drive">
+<span class="drive-icon">HD</span>
+<div>
+<strong>A-OS Device</strong>
+<small>From un recognised drive</small>
+</div>
+<b>Status: Ready</b>
+</div>
+</div>
+</div>
+
+<div class="page hidden" data-page="4">
+<div class="page-heading">
+<div class="heading-icon">IN</div>
+<div>
+<h2>Installing System Software</h2>
+<p>Do not turn off your computer during installation.</p>
+</div>
+</div>
+
+<div class="installation-status">
+<div class="status-line">
+<span id="installStatus">Preparing installation...</span>
+<strong id="percent">0%</strong>
+</div>
+<div class="progress-track">
+<div class="progress-fill" id="progressFill"></div>
+</div>
+<p id="fileStatus">Checking installation files</p>
+</div>
+
+<div class="install-log" id="installLog">
+<div>Setup initialized.</div>
+</div>
+</div>
+
+<div class="page hidden" data-page="5">
+<div class="complete-page">
+<div class="complete-icon">
+<div id="status" class="loader"></div>
+
+<style>
+.loader {
+width: 42px;
+height: 42px;
+border: 4px solid #d9d9d9;
+border-top-color: #111;
+border-radius: 50%;
+animation: spin 0.8s linear infinite;
+}
+
+.tick {
+width: 42px;
+height: 42px;
+display: flex;
+align-items: center;
+justify-content: center;
+font: 42px Arial, sans-serif;
+}
+
+@keyframes spin {
+to {
+transform: rotate(360deg);
+}
+}
+</style>
+
+<script>
+setTimeout(() => {
+const status = document.getElementById("status");
+
+status.className = "tick";
+status.textContent = "✓";
+}, 2000);
+</script>
+</div>
+<h2>Installation Complete</h2>
+<p>System Setup has successfully installed the operating system.</p>
+<p class="muted">Click Finish to restart your computer and begin using the new system.</p>
+</div>
+</div>
+</section>
+</section>
+
+<footer class="bottom-bar">
+<div class="footer-info">
+<span id="clock">00:00 <canvas id="canvas"></canvas>00</span>
+<span>Setup Assistant</span>
+<span>2026 A-OS. Original Product</span>
+</div>
+<div class="actions">
+
+<button class="button secondary" id="backButton" disabled>Back</button>
+<button class="button primary" id="nextButton">Next</button>
+<button class="button primary hidden" id="finishButton">Finish</button>
+</div>
+</footer>
+</main>
+
+<script>let currentPage = 1;
+let installTimer = null;
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+const installerWindow = document.querySelector(".installer-window");
+const topBar = document.querySelector(".top-bar");
+const pages = document.querySelectorAll(".page");
+const steps = document.querySelectorAll(".steps li");
+const backButton = document.getElementById("backButton");
+const nextButton = document.getElementById("nextButton");
+const finishButton = document.getElementById("finishButton");
+const agreement = document.getElementById("agree");
+const minimizeButton = document.querySelector('[aria-label="Minimize"]');
+const closeButton = document.querySelector('[aria-label="Close"]');
+
+const statusMessages = [
+"Preparing installation...",
+"Copying system files...",
+"Expanding installation files...",
+"Installing system components...",
+"Configuring system settings...",
+"Finalizing installation..."
+];
+
+const fileMessages = [
+"Checking installation files",
+"Copying boot files",
+"Installing system libraries",
+"Registering system components",
+"Applying default settings",
+"Cleaning up temporary files"
+];
+
+function updatePage() {
+pages.forEach((page) => {
+page.classList.toggle("hidden", Number(page.dataset.page) !== currentPage);
+});
+
+steps.forEach((step) => {
+step.classList.toggle("active", Number(step.dataset.step) === currentPage);
+});
+
+backButton.disabled = currentPage === 1 || currentPage === 4;
+nextButton.classList.toggle("hidden", currentPage >= 4);
+finishButton.classList.toggle("hidden", currentPage !== 5);
+nextButton.textContent = currentPage === 3 ? "Install" : "Next";
+}
+
+function startInstallation() {
+currentPage = 4;
+updatePage();
+
+let progress = 0;
+const progressFill = document.getElementById("progressFill");
+const percent = document.getElementById("percent");
+const installStatus = document.getElementById("installStatus");
+const fileStatus = document.getElementById("fileStatus");
+const installLog = document.getElementById("installLog");
+
+clearInterval(installTimer);
+
+installTimer = setInterval(() => {
+progress += 1;
+progressFill.style.width = `${progress}%`;
+percent.textContent = `${progress}%`;
+
+const messageIndex = Math.min(
+Math.floor(progress / 17),
+statusMessages.length - 1
+);
+
+installStatus.textContent = statusMessages[messageIndex];
+fileStatus.textContent = fileMessages[messageIndex];
+
+if (progress % 10 === 0) {
+const logLine = document.createElement("div");
+logLine.textContent = `[${String(progress).padStart(3, "0")}%] ${fileMessages[messageIndex]}`;
+installLog.appendChild(logLine);
+installLog.scrollTop = installLog.scrollHeight;
+}
+
+if (progress >= 100) {
+clearInterval(installTimer);
+installStatus.textContent = "Installation finished.";
+fileStatus.textContent = "The system is ready to use.";
+
+setTimeout(() => {
+currentPage = 5;
+updatePage();
+}, 700);
+}
+}, 55);
+}
+
+nextButton.addEventListener("click", () => {
+if (currentPage === 2 && !agreement.checked) {
+const popup = document.createElement("div");
+
+popup.innerHTML = `
+<div style="
+width:350px;
+background:white;
+border:1px solid #999;
+border-radius:10px;
+box-shadow:0 15px 50px rgba(0,0,0,0.35);
+font-family:Arial,sans-serif;
+overflow:hidden;
+">
+<div style="
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:10px 14px;
+border-bottom:1px solid #ddd;
+font-weight:bold;
+">
+<span>Danger</span>
+<button id="popupClose" style="
+border:none;
+background:none;
+font-size:18px;
+cursor:pointer;
+">X</button>
+</div>
+
+<div style="padding:20px;">
+It is required to agree to pass to the next step.
+</div>
+
+<div style="padding:0 20px 20px;">
+<button id="popupOK" style="
+padding:7px 18px;
+cursor:pointer;
+">OK</button>
+</div>
+</div>
+`;
+
+Object.assign(popup.style, {
+position: "fixed",
+inset: "0",
+display: "flex",
+alignItems: "center",
+justifyContent: "center",
+background: "rgba(0,0,0,0.35)",
+zIndex: "999999"
+});
+
+document.body.appendChild(popup);
+
+function closePopup() {
+popup.remove();
+}
+
+document.getElementById("popupClose").onclick = closePopup;
+document.getElementById("popupOK").onclick = closePopup;
+return;
+}
+
+if (currentPage === 3) {
+startInstallation();
+return;
+}
+
+currentPage += 1;
+updatePage();
+});
+
+backButton.addEventListener("click", () => {
+if (currentPage > 1 && currentPage < 4) {
+currentPage -= 1;
+updatePage();
+}
+});
+
+finishButton.addEventListener("click", () => {
+  // Remember that installation has finished.
+  try {
+    localStorage.setItem("aosInstallationFinished", "true");
+  } catch (error) {
+    console.warn("Could not save installation state:", error);
+  }
+
+  // Finish opens next.html this time.
+  window.location.href = "next.html";
+});
+
+minimizeButton.addEventListener("click", (event) => {
+event.stopPropagation();
+installerWindow.classList.toggle("minimized");
+});
+
+closeButton.addEventListener("click", (event) => {
+event.stopPropagation();
+clearInterval(installTimer);
+installerWindow.classList.add("closed");
+});
+
+document.querySelectorAll(".install-option").forEach((option) => {
+option.addEventListener("click", () => {
+document.querySelectorAll(".install-option").forEach((item) => {
+item.classList.remove("selected");
+});
+
+option.classList.add("selected");
+});
+});
+
+function updateClock() {
+const now = new Date();
+
+document.getElementById("clock").textContent = now.toLocaleTimeString([], {
+hour: "2-digit",
+minute: "2-digit",
+second: "2-digit",
+hour12: false
+});
+}
+
+function startDragging(event) {
+if (event.target.closest(".window-controls")) {
+return;
+}
+
+isDragging = true;
+
+const rect = installerWindow.getBoundingClientRect();
+dragOffsetX = event.clientX - rect.left;
+dragOffsetY = event.clientY - rect.top;
+
+installerWindow.style.position = "fixed";
+installerWindow.style.left = `${rect.left}px`;
+installerWindow.style.top = `${rect.top}px`;
+installerWindow.style.margin = "0";
+
+topBar.setPointerCapture(event.pointerId);
+}
+
+function dragWindow(event) {
+if (!isDragging) {
+return;
+}
+
+installerWindow.style.left = `${event.clientX - dragOffsetX}px`;
+installerWindow.style.top = `${event.clientY - dragOffsetY}px`;
+}
+
+function stopDragging(event) {
+if (!isDragging) {
+return;
+}
+
+isDragging = false;
+
+if (topBar.hasPointerCapture(event.pointerId)) {
+topBar.releasePointerCapture(event.pointerId);
+}
+}
+
+topBar.addEventListener("pointerdown", startDragging);
+topBar.addEventListener("pointermove", dragWindow);
+topBar.addEventListener("pointerup", stopDragging);
+topBar.addEventListener("pointercancel", stopDragging);
+
+updatePage();
+updateClock();
+setInterval(updateClock, 1000);</script>
+</body>
+</html>

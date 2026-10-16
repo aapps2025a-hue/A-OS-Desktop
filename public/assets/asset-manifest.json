@@ -1,0 +1,12 @@
+{
+  "version": "2026.10.16",
+  "policy": "missing-only",
+  "folders": {
+    "icons": "assets/icons/",
+    "backgrounds": "assets/backgrounds/",
+    "media": "assets/media/",
+    "cursors": "assets/cursors/",
+    "os": "assets/os/"
+  },
+  "bootAnimation": "assets/os/A-OS Boot.gif"
+}

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A-OS Desktop v1.2.1</title>
+    <meta name="description" content="A-OS Web Operating System with A-Applications, Glassmorphism, and Apple Emoji Pack." />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%2300d4ff'/%3E%3Cstop offset='100%25' stop-color='%230066ff'/%3E%3C/linearGradient%3E%3Cfilter id='glow'%3E%3CfeGaussianBlur stdDeviation='3' result='coloredBlur'/%3E%3CfeMerge%3E%3CfeMergeNode in='coloredBlur'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3C/defs%3E%3Crect width='100' height='100' rx='28' fill='url(%23g)'/%3E%3Cpath d='M50 18 L76 78 L61 78 L56 64 L44 64 L39 78 L24 78 Z M50 35 L47 52 L53 52 Z' fill='%23ffffff' filter='url(%23glow)'/%3E%3C/svg%3E" />
+    <meta property="og:title" content="A-OS Desktop v1.2.1" />
+    <meta property="og:description" content="A-OS Web Operating System with A-Applications, Glassmorphism, and Apple Emoji Pack." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
+    <style>
+      img.emoji {
+        width: 1.2em;
+        height: 1.2em;
+        margin: 0 0.04em;
+        vertical-align: -0.15em;
+        display: inline-block;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .aos-emoji-editor {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 7.5em;
+        padding: 10px;
+        overflow: auto;
+        color: #111;
+        background: #fff;
+        border: 1px solid #999;
+        border-radius: 7px;
+        outline: none;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font: inherit;
+      }
+
+      .aos-emoji-editor:focus {
+        border-color: #1683ff;
+        box-shadow: 0 0 0 2px #1683ff33;
+      }
+
+      .aos-emoji-editor:empty::before {
+        content: attr(data-placeholder);
+        color: #777;
+        pointer-events: none;
+      }
+
+      textarea.aos-emoji-source {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+      }
+    </style>
+    <script defer src="./assets/index-BAvTXyaF.js"></script>
+    <link rel="stylesheet" href="./assets/index-CQLi9h-b.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="twemoji-seed" hidden aria-hidden="true">😄 🚀 🍕 🔥 ✨ 🥑</div>
+    <script src="https://aai-chats-heya.jsabugueiro.chatgpt.site/askembed-bridge.js" defer></script>
+    <script>
+      (function () {
+        var options = {
+          base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
+          folder: "svg",
+          ext: ".svg"
+        };
+
+        function parseTwemoji(target) {
+          if (!window.twemoji || !target) return;
+          window.twemoji.parse(target, options);
+        }
+
+        function parsePage() {
+          parseTwemoji(document.body);
+        }
+
+        document.addEventListener("DOMContentLoaded", parsePage);
+        window.addEventListener("load", parsePage);
+        setTimeout(parsePage, 250);
+        setTimeout(parsePage, 1000);
+
+        var queued = false;
+        new MutationObserver(function () {
+          if (queued) return;
+          queued = true;
+          requestAnimationFrame(function () {
+            queued = false;
+            parsePage();
+          });
+        }).observe(document.body, {
+          childList: true,
+          subtree: true,
+          characterData: true
+        });
+      })();
+    </script>
+    <script>
+      (() => {
+        "use strict";
+
+        const OPTIONS = {
+          base: "https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/",
+          folder: "svg",
+          ext: ".svg"
+        };
+
+        const observers = new WeakMap();
+
+        function parse(root) {
+          if (!window.twemoji || !root) return;
+          if (root.nodeType === Node.ELEMENT_NODE && root.matches("img.emoji, textarea, input, script, style, code, pre")) return;
+          twemoji.parse(root, OPTIONS);
+        }
+
+        function plainText(editor) {
+          const copy = editor.cloneNode(true);
+          copy.querySelectorAll("img.emoji").forEach((image) => {
+            image.replaceWith(document.createTextNode(image.alt || ""));
+          });
+          return copy.innerText.replace(/\r/g, "");
+        }
+
+        function caretToEnd(editor) {
+          const selection = editor.ownerDocument.getSelection();
+          const range = editor.ownerDocument.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+
+        function renderEditor(editor, focusAfter = false) {
+          const textarea = editor._aosTextarea;
+          const text = plainText(editor);
+          textarea.value = text;
+          editor.textContent = text;
+          parse(editor);
+          if (focusAfter) caretToEnd(editor);
+        }
+
+        function upgradeTextarea(textarea) {
+          if (textarea.dataset.aosEmojiReady === "true") return;
+          textarea.dataset.aosEmojiReady = "true";
+          textarea.classList.add("aos-emoji-source");
+
+          const editor = textarea.ownerDocument.createElement("div");
+          editor.className = "aos-emoji-editor";
+          editor.contentEditable = textarea.disabled || textarea.readOnly ? "false" : "true";
+          editor.setAttribute("role", "textbox");
+          editor.setAttribute("aria-multiline", "true");
+          editor.setAttribute("aria-label", textarea.getAttribute("aria-label") || textarea.name || "Text area");
+          editor.dataset.placeholder = textarea.placeholder || "";
+          editor._aosTextarea = textarea;
+          textarea.insertAdjacentElement("afterend", editor);
+          editor.textContent = textarea.value;
+          parse(editor);
+
+          editor.addEventListener("input", () => renderEditor(editor, true));
+          editor.addEventListener("paste", (event) => {
+            event.preventDefault();
+            const text = event.clipboardData.getData("text/plain");
+            editor.ownerDocument.execCommand("insertText", false, text);
+          });
+
+          textarea.form?.addEventListener("reset", () => {
+            setTimeout(() => {
+              editor.textContent = textarea.value;
+              parse(editor);
+            });
+          });
+        }
+
+        function prepare(root) {
+          if (!root?.querySelectorAll) return;
+          root.querySelectorAll("textarea").forEach(upgradeTextarea);
+          root.querySelectorAll("iframe").forEach(prepareIframe);
+        }
+
+        function observe(doc) {
+          if (!doc.body || observers.has(doc)) return;
+          const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+              for (const node of mutation.addedNodes) {
+                if (node.nodeType !== Node.ELEMENT_NODE || node.matches("img.emoji")) continue;
+                if (node.matches("textarea")) upgradeTextarea(node);
+                if (node.matches("iframe")) prepareIframe(node);
+                prepare(node);
+                parse(node);
+              }
+            }
+          });
+          observer.observe(doc.body, { childList: true, subtree: true });
+          observers.set(doc, observer);
+        }
+
+        function prepareIframe(iframe) {
+          if (iframe.dataset.aosEmojiFrameReady === "true") return;
+          iframe.dataset.aosEmojiFrameReady = "true";
+          iframe.addEventListener("load", () => {
+            try {
+              const doc = iframe.contentDocument;
+              if (!doc?.body) return;
+              parse(doc.body);
+              prepare(doc);
+              observe(doc);
+            } catch (_) {
+              /* Browsers prohibit changes inside cross-origin embeds. */
+            }
+          });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+          parse(document.body);
+          prepare(document);
+          observe(document);
+        });
+      })();
+    </script>
+  </body>
+</html>
