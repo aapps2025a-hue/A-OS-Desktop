@@ -1,0 +1,302 @@
+.aos-live-iso .setup {
+  background: #050607 !important;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px) !important;
+  gap: 0 !important;
+  padding: clamp(18px, 4vw, 54px) !important;
+}
+
+.aos-live-iso .setup > aside,
+.aos-live-iso .setup > .setup-content {
+  min-height: min(760px, calc(100dvh - 72px));
+}
+
+.aos-live-iso .setup > aside {
+  order: 2;
+  width: min(340px, 32vw) !important;
+  color: #122033 !important;
+  background: rgba(236, 241, 246, 0.96) !important;
+  border-left: 1px solid #d8e2ea !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.aos-live-iso .setup > .setup-content {
+  order: 1;
+  color: #102039 !important;
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-radius: 8px 0 0 8px !important;
+}
+
+.aos-live-iso .setup > .setup-content header h1 {
+  font-family: "TT Norms", "Segoe UI", sans-serif !important;
+  font-size: 68px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+
+.aos-live-iso .setup button {
+  border-radius: 6px !important;
+}
+
+.aos-live-iso .aos-native-setup-device {
+  width: fit-content;
+  margin: 0 0 18px !important;
+  border: 1px solid #087bc1 !important;
+  color: #fff !important;
+  background: #0788d2 !important;
+  padding: 10px 14px !important;
+  font-weight: 750 !important;
+  cursor: pointer;
+}
+
+.aos-live-iso .battery-image-frame {
+  width: 52px !important;
+  height: 32px !important;
+}
+
+.aos-live-iso .battery-quick-icon {
+  width: 52px !important;
+  height: 52px !important;
+  top: -10px !important;
+  left: 0 !important;
+  object-fit: contain !important;
+}
+
+.aos-native-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483600;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  color: #13243a;
+  background: rgba(1, 8, 16, 0.62);
+  font-family: "TT Norms", "Segoe UI", system-ui, sans-serif;
+}
+
+.aos-native-panel[hidden] {
+  display: none;
+}
+
+.aos-native-panel__window {
+  width: min(720px, 100%);
+  max-height: min(760px, calc(100dvh - 36px));
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 8px;
+  background: rgba(248, 252, 255, 0.96);
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(28px) saturate(150%);
+}
+
+.aos-native-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px 8px 16px;
+  border-bottom: 1px solid #dce7ee;
+  background: rgba(234, 245, 251, 0.92);
+}
+
+.aos-native-panel__header img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.aos-native-panel__header strong {
+  flex: 1;
+  font-size: 15px;
+}
+
+.aos-native-panel button {
+  min-height: 36px;
+  border: 1px solid #c9d9e4;
+  border-radius: 6px;
+  color: #10233a;
+  background: #fff;
+  padding: 7px 12px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.aos-native-panel button.primary {
+  border-color: #087bc1;
+  color: #fff;
+  background: #0788d2;
+}
+
+.aos-native-panel__close {
+  width: 36px;
+  padding: 0 !important;
+  font-size: 22px !important;
+}
+
+.aos-native-panel__tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px 0;
+}
+
+.aos-native-panel__tabs button[aria-selected="true"] {
+  border-color: #0788d2;
+  color: #fff;
+  background: #0788d2;
+}
+
+.aos-native-panel__body {
+  max-height: calc(100dvh - 190px);
+  overflow: auto;
+  padding: 16px;
+}
+
+.aos-native-panel__toolbar,
+.aos-native-device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.aos-native-panel__toolbar {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.aos-native-panel__toolbar > span {
+  flex: 1;
+}
+
+.aos-native-panel__toolbar > span b,
+.aos-native-panel__toolbar > span small {
+  display: block;
+}
+
+.aos-native-panel__toolbar > span small {
+  margin-top: 2px;
+  color: #667889;
+}
+
+.aos-native-device {
+  min-height: 62px;
+  margin-top: 8px;
+  border: 1px solid #d8e4eb;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 10px 12px;
+}
+
+.aos-native-device > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.aos-native-device b,
+.aos-native-device small {
+  display: block;
+}
+
+.aos-native-device small {
+  margin-top: 3px;
+  color: #667889;
+}
+
+.aos-native-device input {
+  width: min(220px, 30vw);
+  min-height: 36px;
+  border: 1px solid #bdced9;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.aos-native-empty {
+  margin: 28px 0;
+  color: #667889;
+  text-align: center;
+}
+
+.aos-native-browser-menu-button {
+  flex: 0 0 36px;
+  width: 36px;
+  font-size: 20px !important;
+}
+
+.aos-native-browser-emoji {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  overflow: hidden;
+}
+
+.aos-native-browser-emoji img {
+  width: 23px;
+  height: 23px;
+  object-fit: contain;
+}
+
+.aos-native-browser-menu {
+  position: absolute;
+  z-index: 50;
+  top: 82px;
+  right: 10px;
+  display: grid;
+  width: 210px;
+  overflow: hidden;
+  border: 1px solid #d6e1e8;
+  border-radius: 7px;
+  background: rgba(250, 253, 255, 0.98);
+  padding: 6px;
+  box-shadow: 0 18px 46px rgba(2, 16, 31, 0.3);
+}
+
+.aos-native-browser-menu[hidden] {
+  display: none;
+}
+
+.aos-native-browser-menu button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 9px 10px;
+  color: #12243b;
+  text-align: left;
+  cursor: pointer;
+}
+
+.aos-native-browser-menu button:hover {
+  background: #e4f2fb;
+}
+
+@media (max-width: 760px) {
+  .aos-live-iso .setup {
+    grid-template-columns: minmax(0, 1fr) !important;
+    padding: 0 !important;
+  }
+
+  .aos-live-iso .setup > aside {
+    display: none !important;
+  }
+
+  .aos-live-iso .setup > .setup-content {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 100dvh;
+    border-radius: 0 !important;
+  }
+
+  .aos-live-iso .setup > .setup-content header h1 {
+    font-size: 38px !important;
+  }
+
+  .aos-native-device {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .aos-native-device input {
+    width: 100%;
+  }
+}

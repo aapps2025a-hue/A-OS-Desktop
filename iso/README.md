@@ -1,12 +1,18 @@
 # A-OS Desktop live ISO
 
 This directory is the complete, open-source Debian Live configuration for the
-A-OS Desktop ISO. The image boots a lightweight Linux session, starts a local
-web server, opens Chromium in kiosk mode, and loads the same `public/index.html`
-build used by Firebase and GitHub Pages. The first visible application screen
-therefore uses the same `assets/os/A-OS Boot.gif` animation as the website. The
-automated QEMU test waits for a callback from the mounted A-OS page, so a local
-server alone is no longer enough for an ISO build to pass.
+A-OS Desktop ISO. The image boots a lightweight Linux session, starts a
+localhost-only web and hardware bridge, opens Chromium in kiosk mode, and loads
+the same `public/index.html` build used by Firebase and GitHub Pages. A quiet
+A-OS Plymouth theme covers Linux startup; Chromium then plays the same
+`assets/os/A-OS Boot.gif` animation as the website and enters the A-OS setup
+automatically.
+
+The native bridge provides real NetworkManager Wi-Fi scanning and connection,
+BlueZ Bluetooth pairing, Linux battery status, and device restart/shutdown.
+Virtual machines only show physical Wi-Fi or Bluetooth devices when the host
+passes the corresponding hardware through to the guest. The live boot enables
+Debian Live persistence when the USB has a writable persistence partition.
 
 ## Build on Debian or Ubuntu
 
@@ -23,5 +29,6 @@ sudo lb build
 
 The result is `live-image-amd64.hybrid.iso`. It is an ISO-hybrid image suitable
 for a virtual machine, DVD, or writing directly to a USB drive. The GitHub
-workflow builds it in a clean runner, publishes a checksum, and uploads the ISO
-to the `iso-v1.2.1-classic1` release.
+workflow builds it in a clean runner, boots it in QEMU until the real packaged
+HTML reports ready, publishes a checksum, and uploads the ISO to the
+`iso-v1.2.1-classic1` release.

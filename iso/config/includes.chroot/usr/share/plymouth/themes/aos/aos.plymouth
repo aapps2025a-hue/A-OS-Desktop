@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=A-OS
+Description=Quiet A-OS startup
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/aos
+ScriptFile=/usr/share/plymouth/themes/aos/aos.script

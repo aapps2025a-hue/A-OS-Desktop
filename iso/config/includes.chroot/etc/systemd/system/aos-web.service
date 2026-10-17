@@ -1,0 +1,19 @@
+[Unit]
+Description=A-OS local web and hardware bridge
+After=local-fs.target NetworkManager.service bluetooth.service
+Wants=NetworkManager.service bluetooth.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/aos/server.py
+Restart=always
+RestartSec=1
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=false
+ProtectHome=true
+ReadOnlyPaths=/opt/a-os/public
+ReadWritePaths=/tmp
+
+[Install]
+WantedBy=multi-user.target

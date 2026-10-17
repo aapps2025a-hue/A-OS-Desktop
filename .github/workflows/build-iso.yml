@@ -34,6 +34,7 @@ jobs:
 
       - name: Add the current A-OS web build
         run: |
+          node scripts/stamp-version.mjs
           rm -rf iso/config/includes.chroot/opt/a-os/public
           mkdir -p iso/config/includes.chroot/opt/a-os/public
           cp -a public/. iso/config/includes.chroot/opt/a-os/public/
@@ -94,8 +95,8 @@ jobs:
         run: |
           if ! gh release view iso-v1.2.1-classic1 >/dev/null 2>&1; then
             gh release create iso-v1.2.1-classic1 \
-              --title "A-OS Desktop Classic bootable ISO" \
-              --notes "Bootable Debian Live image containing the classic A-OS artwork, original icons, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium mounts the packaged page."
+              --title "A-OS Desktop hardware-enabled bootable ISO" \
+              --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium mounts the packaged page."
           fi
           gh release upload iso-v1.2.1-classic1 \
             A-OS-Desktop-amd64.iso \

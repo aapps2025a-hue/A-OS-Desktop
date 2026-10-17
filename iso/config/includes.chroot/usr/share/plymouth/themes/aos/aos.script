@@ -1,0 +1,14 @@
+Window.SetBackgroundTopColor(0.024, 0.067, 0.122);
+Window.SetBackgroundBottomColor(0.024, 0.067, 0.122);
+
+logo_image = Image("aos-logo.png");
+logo_sprite = Sprite(logo_image);
+logo_sprite.SetX(Window.GetWidth() / 2 - logo_image.GetWidth() / 2);
+logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2);
+logo_sprite.SetZ(10000);
+
+fun refresh_callback () {
+  logo_sprite.SetOpacity(1);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);

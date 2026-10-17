@@ -4,4 +4,10 @@ set -eu
 chmod 0755 /usr/local/lib/aos/server.py
 chmod 0755 /usr/local/lib/aos/start-session.sh
 chmod 0755 /etc/skel/.xinitrc
+systemctl enable aos-web.service
 systemctl enable aos-session.service
+systemctl enable NetworkManager.service
+systemctl enable bluetooth.service
+systemctl disable NetworkManager-wait-online.service 2>/dev/null || true
+systemctl mask apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
+plymouth-set-default-theme -R aos 2>/dev/null || true

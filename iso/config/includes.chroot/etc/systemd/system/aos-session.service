@@ -1,6 +1,7 @@
 [Unit]
 Description=A-OS Desktop kiosk session
-After=systemd-user-sessions.service
+After=systemd-user-sessions.service aos-web.service
+Wants=aos-web.service
 
 [Service]
 Type=simple

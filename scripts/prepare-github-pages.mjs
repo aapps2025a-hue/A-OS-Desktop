@@ -28,5 +28,13 @@ function walk(folder) {
 }
 
 walk(fileURLToPath(output));
+writeFileSync(
+  new URL("version.json", output),
+  JSON.stringify({
+    version: "1.2.1",
+    build: new Date().toISOString(),
+    revision: process.env.GITHUB_SHA || "github-pages"
+  }, null, 2) + "\n"
+);
 cpSync(new URL("index.html", output), new URL("404.html", output));
 
