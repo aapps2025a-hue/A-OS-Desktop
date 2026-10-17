@@ -20,14 +20,21 @@ echo "AOS_LOCAL_SERVER_READY"
   echo "AOS_BROWSER_HTML_READY"
 ) &
 
+chromium_gpu_flags=""
+if grep -Eqi 'qemu|kvm' /sys/class/dmi/id/product_name 2>/dev/null; then
+  chromium_gpu_flags="--disable-gpu"
+fi
+
 while true; do
   chromium \
+    $chromium_gpu_flags \
     --kiosk \
     --no-first-run \
     --no-default-browser-check \
     --noerrdialogs \
     --disable-session-crashed-bubble \
     --disable-infobars \
+    --disable-dev-shm-usage \
     --disable-translate \
     --disable-background-networking \
     --disable-component-update \
