@@ -35,6 +35,6 @@ while true; do
     --autoplay-policy=no-user-gesture-required \
     --password-store=basic \
     --user-data-dir=/home/aos/.config/aos-chromium \
-    "http://127.0.0.1:5000/index.html?aosLiveIso=1"
+    "http://127.0.0.1:5000/index.html?aosLiveIso=1&aosTestRam=3"
   sleep 1
 done
