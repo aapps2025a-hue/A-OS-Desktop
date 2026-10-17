@@ -1,0 +1,13 @@
+{
+  "id": "aos-complete",
+  "name": "A-OS Complete Emoji Pack",
+  "version": "14.0.2",
+  "count": 3624,
+  "assetCount": 3689,
+  "catalog": "catalog.json",
+  "assets": "svg/",
+  "licenseFiles": [
+    "LICENSE",
+    "LICENSE-GRAPHICS"
+  ]
+}

@@ -1,0 +1,536 @@
+{
+  "name": "A-OS recovered icon library",
+  "version": "2026.10.17",
+  "recoveredVectorCount": 49,
+  "legacyIconCount": 75,
+  "totalRecoveredFiles": 124,
+  "vectorCatalog": "aos-originals/catalog.json",
+  "legacyDirectory": "aos-originals/legacy/",
+  "legacyIcons": [
+    {
+      "name": "0 battery  Charging",
+      "originalFile": "0 battery  Charging.png",
+      "recoveredFile": "aos-originals/legacy/0 battery  Charging.png",
+      "format": "png",
+      "bytes": 1084
+    },
+    {
+      "name": "0 battery",
+      "originalFile": "0 battery.png",
+      "recoveredFile": "aos-originals/legacy/0 battery.png",
+      "format": "png",
+      "bytes": 802
+    },
+    {
+      "name": "38",
+      "originalFile": "38.png",
+      "recoveredFile": "aos-originals/legacy/38.png",
+      "format": "png",
+      "bytes": 4526
+    },
+    {
+      "name": "AI Services (Hidden App)",
+      "originalFile": "AI Services (Hidden App).png",
+      "recoveredFile": "aos-originals/legacy/AI Services (Hidden App).png",
+      "format": "png",
+      "bytes": 2234
+    },
+    {
+      "name": "aos",
+      "originalFile": "aos.png",
+      "recoveredFile": "aos-originals/legacy/aos.png",
+      "format": "png",
+      "bytes": 1263
+    },
+    {
+      "name": "Arrow Left",
+      "originalFile": "Arrow Left.png",
+      "recoveredFile": "aos-originals/legacy/Arrow Left.png",
+      "format": "png",
+      "bytes": 1372
+    },
+    {
+      "name": "Arrow Right",
+      "originalFile": "Arrow Right.png",
+      "recoveredFile": "aos-originals/legacy/Arrow Right.png",
+      "format": "png",
+      "bytes": 1375
+    },
+    {
+      "name": "Arrow Up",
+      "originalFile": "Arrow Up.png",
+      "recoveredFile": "aos-originals/legacy/Arrow Up.png",
+      "format": "png",
+      "bytes": 1404
+    },
+    {
+      "name": "Battery",
+      "originalFile": "Battery.png",
+      "recoveredFile": "aos-originals/legacy/Battery.png",
+      "format": "png",
+      "bytes": 862
+    },
+    {
+      "name": "Browser",
+      "originalFile": "Browser.png",
+      "recoveredFile": "aos-originals/legacy/Browser.png",
+      "format": "png",
+      "bytes": 1837
+    },
+    {
+      "name": "Bug",
+      "originalFile": "Bug.png",
+      "recoveredFile": "aos-originals/legacy/Bug.png",
+      "format": "png",
+      "bytes": 3012
+    },
+    {
+      "name": "Bugged",
+      "originalFile": "Bugged.png",
+      "recoveredFile": "aos-originals/legacy/Bugged.png",
+      "format": "png",
+      "bytes": 1450
+    },
+    {
+      "name": "Calculator",
+      "originalFile": "Calculator.png",
+      "recoveredFile": "aos-originals/legacy/Calculator.png",
+      "format": "png",
+      "bytes": 1319
+    },
+    {
+      "name": "Camera",
+      "originalFile": "Camera.png",
+      "recoveredFile": "aos-originals/legacy/Camera.png",
+      "format": "png",
+      "bytes": 1400
+    },
+    {
+      "name": "Clock",
+      "originalFile": "Clock.png",
+      "recoveredFile": "aos-originals/legacy/Clock.png",
+      "format": "png",
+      "bytes": 1349
+    },
+    {
+      "name": "Cloud",
+      "originalFile": "Cloud.png",
+      "recoveredFile": "aos-originals/legacy/Cloud.png",
+      "format": "png",
+      "bytes": 903
+    },
+    {
+      "name": "Code",
+      "originalFile": "Code.png",
+      "recoveredFile": "aos-originals/legacy/Code.png",
+      "format": "png",
+      "bytes": 1635
+    },
+    {
+      "name": "Company",
+      "originalFile": "Company.png",
+      "recoveredFile": "aos-originals/legacy/Company.png",
+      "format": "png",
+      "bytes": 1214
+    },
+    {
+      "name": "Cross",
+      "originalFile": "Cross.png",
+      "recoveredFile": "aos-originals/legacy/Cross.png",
+      "format": "png",
+      "bytes": 1450
+    },
+    {
+      "name": "css",
+      "originalFile": "css.png",
+      "recoveredFile": "aos-originals/legacy/css.png",
+      "format": "png",
+      "bytes": 1635
+    },
+    {
+      "name": "Dead A Screen (bsod but das)",
+      "originalFile": "Dead A Screen (bsod but das).png",
+      "recoveredFile": "aos-originals/legacy/Dead A Screen (bsod but das).png",
+      "format": "png",
+      "bytes": 2260
+    },
+    {
+      "name": "Downloads",
+      "originalFile": "Downloads.png",
+      "recoveredFile": "aos-originals/legacy/Downloads.png",
+      "format": "png",
+      "bytes": 1192
+    },
+    {
+      "name": "Draw",
+      "originalFile": "Draw.png",
+      "recoveredFile": "aos-originals/legacy/Draw.png",
+      "format": "png",
+      "bytes": 3390
+    },
+    {
+      "name": "Error",
+      "originalFile": "Error.png",
+      "recoveredFile": "aos-originals/legacy/Error.png",
+      "format": "png",
+      "bytes": 1450
+    },
+    {
+      "name": "Files",
+      "originalFile": "Files.png",
+      "recoveredFile": "aos-originals/legacy/Files.png",
+      "format": "png",
+      "bytes": 1074
+    },
+    {
+      "name": "Full Battery  Charging",
+      "originalFile": "Full Battery  Charging.png",
+      "recoveredFile": "aos-originals/legacy/Full Battery  Charging.png",
+      "format": "png",
+      "bytes": 1159
+    },
+    {
+      "name": "Full Battery",
+      "originalFile": "Full Battery.png",
+      "recoveredFile": "aos-originals/legacy/Full Battery.png",
+      "format": "png",
+      "bytes": 862
+    },
+    {
+      "name": "Half Battery Charging",
+      "originalFile": "Half Battery Charging.png",
+      "recoveredFile": "aos-originals/legacy/Half Battery Charging.png",
+      "format": "png",
+      "bytes": 1182
+    },
+    {
+      "name": "Half Battery",
+      "originalFile": "Half Battery.png",
+      "recoveredFile": "aos-originals/legacy/Half Battery.png",
+      "format": "png",
+      "bytes": 850
+    },
+    {
+      "name": "html",
+      "originalFile": "html.png",
+      "recoveredFile": "aos-originals/legacy/html.png",
+      "format": "png",
+      "bytes": 1635
+    },
+    {
+      "name": "Image",
+      "originalFile": "Image.png",
+      "recoveredFile": "aos-originals/legacy/Image.png",
+      "format": "png",
+      "bytes": 1400
+    },
+    {
+      "name": "Images",
+      "originalFile": "Images.png",
+      "recoveredFile": "aos-originals/legacy/Images.png",
+      "format": "png",
+      "bytes": 1400
+    },
+    {
+      "name": "Internet",
+      "originalFile": "Internet.png",
+      "recoveredFile": "aos-originals/legacy/Internet.png",
+      "format": "png",
+      "bytes": 1837
+    },
+    {
+      "name": "js",
+      "originalFile": "js.png",
+      "recoveredFile": "aos-originals/legacy/js.png",
+      "format": "png",
+      "bytes": 1635
+    },
+    {
+      "name": "Keyboard",
+      "originalFile": "Keyboard.svg",
+      "recoveredFile": "aos-originals/legacy/Keyboard.svg",
+      "format": "svg",
+      "bytes": 928
+    },
+    {
+      "name": "Less",
+      "originalFile": "Less.png",
+      "recoveredFile": "aos-originals/legacy/Less.png",
+      "format": "png",
+      "bytes": 1147
+    },
+    {
+      "name": "lock",
+      "originalFile": "lock.png",
+      "recoveredFile": "aos-originals/legacy/lock.png",
+      "format": "png",
+      "bytes": 3181
+    },
+    {
+      "name": "Low Battery Charging",
+      "originalFile": "Low Battery Charging.png",
+      "recoveredFile": "aos-originals/legacy/Low Battery Charging.png",
+      "format": "png",
+      "bytes": 1167
+    },
+    {
+      "name": "Low Battery",
+      "originalFile": "Low Battery.png",
+      "recoveredFile": "aos-originals/legacy/Low Battery.png",
+      "format": "png",
+      "bytes": 861
+    },
+    {
+      "name": "Lucky",
+      "originalFile": "Lucky.png",
+      "recoveredFile": "aos-originals/legacy/Lucky.png",
+      "format": "png",
+      "bytes": 1952
+    },
+    {
+      "name": "Media Files",
+      "originalFile": "Media Files.png",
+      "recoveredFile": "aos-originals/legacy/Media Files.png",
+      "format": "png",
+      "bytes": 1073
+    },
+    {
+      "name": "Money",
+      "originalFile": "Money.png",
+      "recoveredFile": "aos-originals/legacy/Money.png",
+      "format": "png",
+      "bytes": 4363
+    },
+    {
+      "name": "More",
+      "originalFile": "More.png",
+      "recoveredFile": "aos-originals/legacy/More.png",
+      "format": "png",
+      "bytes": 4363
+    },
+    {
+      "name": "Mostly Full Battery (2)",
+      "originalFile": "Mostly Full Battery (2).png",
+      "recoveredFile": "aos-originals/legacy/Mostly Full Battery (2).png",
+      "format": "png",
+      "bytes": 848
+    },
+    {
+      "name": "Mostly Full Battery",
+      "originalFile": "Mostly Full Battery.png",
+      "recoveredFile": "aos-originals/legacy/Mostly Full Battery.png",
+      "format": "png",
+      "bytes": 848
+    },
+    {
+      "name": "Music",
+      "originalFile": "Music.png",
+      "recoveredFile": "aos-originals/legacy/Music.png",
+      "format": "png",
+      "bytes": 1248
+    },
+    {
+      "name": "Notes",
+      "originalFile": "Notes.png",
+      "recoveredFile": "aos-originals/legacy/Notes.png",
+      "format": "png",
+      "bytes": 3714
+    },
+    {
+      "name": "OS Logo",
+      "originalFile": "OS Logo.png",
+      "recoveredFile": "aos-originals/legacy/OS Logo.png",
+      "format": "png",
+      "bytes": 1263
+    },
+    {
+      "name": "PC",
+      "originalFile": "PC.png",
+      "recoveredFile": "aos-originals/legacy/PC.png",
+      "format": "png",
+      "bytes": 1179
+    },
+    {
+      "name": "Profile",
+      "originalFile": "Profile.png",
+      "recoveredFile": "aos-originals/legacy/Profile.png",
+      "format": "png",
+      "bytes": 1074
+    },
+    {
+      "name": "Reboot",
+      "originalFile": "Reboot.png",
+      "recoveredFile": "aos-originals/legacy/Reboot.png",
+      "format": "png",
+      "bytes": 1602
+    },
+    {
+      "name": "Record",
+      "originalFile": "Record.png",
+      "recoveredFile": "aos-originals/legacy/Record.png",
+      "format": "png",
+      "bytes": 1412
+    },
+    {
+      "name": "Safe",
+      "originalFile": "Safe.png",
+      "recoveredFile": "aos-originals/legacy/Safe.png",
+      "format": "png",
+      "bytes": 1532
+    },
+    {
+      "name": "Screenshot",
+      "originalFile": "Screenshot.svg",
+      "recoveredFile": "aos-originals/legacy/Screenshot.svg",
+      "format": "svg",
+      "bytes": 603
+    },
+    {
+      "name": "Search",
+      "originalFile": "Search.svg",
+      "recoveredFile": "aos-originals/legacy/Search.svg",
+      "format": "svg",
+      "bytes": 281
+    },
+    {
+      "name": "Security Shield Assistant",
+      "originalFile": "Security Shield Assistant.png",
+      "recoveredFile": "aos-originals/legacy/Security Shield Assistant.png",
+      "format": "png",
+      "bytes": 1532
+    },
+    {
+      "name": "Security Shield",
+      "originalFile": "Security Shield.png",
+      "recoveredFile": "aos-originals/legacy/Security Shield.png",
+      "format": "png",
+      "bytes": 1532
+    },
+    {
+      "name": "Settings",
+      "originalFile": "Settings.png",
+      "recoveredFile": "aos-originals/legacy/Settings.png",
+      "format": "png",
+      "bytes": 1971
+    },
+    {
+      "name": "Shutdown",
+      "originalFile": "Shutdown.png",
+      "recoveredFile": "aos-originals/legacy/Shutdown.png",
+      "format": "png",
+      "bytes": 1436
+    },
+    {
+      "name": "splash",
+      "originalFile": "splash.png",
+      "recoveredFile": "aos-originals/legacy/splash.png",
+      "format": "png",
+      "bytes": 1263
+    },
+    {
+      "name": "STAR",
+      "originalFile": "STAR.png",
+      "recoveredFile": "aos-originals/legacy/STAR.png",
+      "format": "png",
+      "bytes": 2820
+    },
+    {
+      "name": "Success",
+      "originalFile": "Success.png",
+      "recoveredFile": "aos-originals/legacy/Success.png",
+      "format": "png",
+      "bytes": 1297
+    },
+    {
+      "name": "System",
+      "originalFile": "System.png",
+      "recoveredFile": "aos-originals/legacy/System.png",
+      "format": "png",
+      "bytes": 1263
+    },
+    {
+      "name": "Terminal",
+      "originalFile": "Terminal.png",
+      "recoveredFile": "aos-originals/legacy/Terminal.png",
+      "format": "png",
+      "bytes": 1241
+    },
+    {
+      "name": "terminalcmd",
+      "originalFile": "terminalcmd.png",
+      "recoveredFile": "aos-originals/legacy/terminalcmd.png",
+      "format": "png",
+      "bytes": 1241
+    },
+    {
+      "name": "Text Editor",
+      "originalFile": "Text Editor.png",
+      "recoveredFile": "aos-originals/legacy/Text Editor.png",
+      "format": "png",
+      "bytes": 1197
+    },
+    {
+      "name": "This PC",
+      "originalFile": "This PC.png",
+      "recoveredFile": "aos-originals/legacy/This PC.png",
+      "format": "png",
+      "bytes": 1179
+    },
+    {
+      "name": "Tick",
+      "originalFile": "Tick.png",
+      "recoveredFile": "aos-originals/legacy/Tick.png",
+      "format": "png",
+      "bytes": 1297
+    },
+    {
+      "name": "tma",
+      "originalFile": "tma.png",
+      "recoveredFile": "aos-originals/legacy/tma.png",
+      "format": "png",
+      "bytes": 1105
+    },
+    {
+      "name": "Trash",
+      "originalFile": "Trash.png",
+      "recoveredFile": "aos-originals/legacy/Trash.png",
+      "format": "png",
+      "bytes": 1105
+    },
+    {
+      "name": "Unnamed app",
+      "originalFile": "Unnamed app.png",
+      "recoveredFile": "aos-originals/legacy/Unnamed app.png",
+      "format": "png",
+      "bytes": 2841
+    },
+    {
+      "name": "UnSafe",
+      "originalFile": "UnSafe.png",
+      "recoveredFile": "aos-originals/legacy/UnSafe.png",
+      "format": "png",
+      "bytes": 1618
+    },
+    {
+      "name": "Video",
+      "originalFile": "Video.png",
+      "recoveredFile": "aos-originals/legacy/Video.png",
+      "format": "png",
+      "bytes": 1412
+    },
+    {
+      "name": "Weather",
+      "originalFile": "Weather.png",
+      "recoveredFile": "aos-originals/legacy/Weather.png",
+      "format": "png",
+      "bytes": 1437
+    },
+    {
+      "name": "zip",
+      "originalFile": "zip.png",
+      "recoveredFile": "aos-originals/legacy/zip.png",
+      "format": "png",
+      "bytes": 1879
+    }
+  ]
+}

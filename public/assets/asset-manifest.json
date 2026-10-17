@@ -1,12 +1,17 @@
 {
-  "version": "2026.10.16",
+  "version": "2026.10.17",
   "policy": "missing-only",
   "folders": {
     "icons": "assets/icons/",
     "backgrounds": "assets/backgrounds/",
     "media": "assets/media/",
     "cursors": "assets/cursors/",
-    "os": "assets/os/"
+    "os": "assets/os/",
+    "emojis": "assets/emojis/",
+    "completeEmojiPack": "assets/emojis/aos-complete/",
+    "originalIcons": "assets/icons/aos-originals/"
   },
-  "bootAnimation": "assets/os/A-OS Boot.gif"
+  "bootAnimation": "assets/os/A-OS Boot.gif",
+  "emojiCatalog": "assets/emojis/aos-complete/catalog.json",
+  "iconCatalog": "assets/icons/catalog.json"
 }
