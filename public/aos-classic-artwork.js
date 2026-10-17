@@ -1,8 +1,8 @@
 (function () {
   "use strict";
 
-  var RESTORE_VERSION = "2026-10-17-classic-3";
-  var ASSET_VERSION = "20261017-classic3";
+  var RESTORE_VERSION = "2026-10-17-classic-4";
+  var ASSET_VERSION = "20261017-classic4";
   var VERSION_KEY = "aos-classic-artwork-version";
   var BACKUP_KEY = "aos-classic-artwork-backup";
 
@@ -92,6 +92,9 @@
     if (!value || /^(data:|blob:)/i.test(value)) return value;
     try {
       var url = new URL(value, document.baseURI);
+      if (url.hostname === "a-os-desktop.jsabugueiro.chatgpt.site" && /\/assets\/(icons|backgrounds)\//.test(url.pathname)) {
+        url = new URL("." + url.pathname, document.baseURI);
+      }
       if (url.origin !== window.location.origin) return value;
       if (!/\/assets\/(icons|backgrounds)\//.test(url.pathname)) return value;
       if (url.searchParams.get("v") === ASSET_VERSION) return value;
