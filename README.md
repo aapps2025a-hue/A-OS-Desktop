@@ -63,7 +63,8 @@ it does not modify the Firebase build.
 The open-source Debian Live configuration is in `iso`. GitHub Actions builds a
 real ISO-hybrid image that boots into Chromium and serves this exact `public`
 folder locally, including the same A-OS boot GIF. The generated ISO and SHA-256
-checksum are published in the `iso-v1.2.1-managed11` GitHub release.
+checksum are published in the `iso-v1.2.1-classic1` GitHub release. The QEMU
+test waits until Chromium mounts the packaged A-OS HTML before publishing.
 
 ## License
 

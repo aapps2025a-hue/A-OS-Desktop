@@ -62,8 +62,8 @@ jobs:
           qemu_pid=$!
           trap 'kill "$qemu_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 300); do
-            if grep -q "AOS_BOOT_READY" /tmp/aos-serial.log 2>/dev/null; then
-              echo "A-OS reached its local HTML server after boot."
+            if grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-serial.log 2>/dev/null; then
+              echo "Chromium mounted the packaged A-OS HTML after boot."
               exit 0
             fi
             if ! kill -0 "$qemu_pid" 2>/dev/null; then
@@ -73,7 +73,7 @@ jobs:
             sleep 2
           done
           cat /tmp/aos-serial.log
-          echo "A-OS did not reach the HTML server within ten minutes." >&2
+          echo "Chromium did not mount the packaged A-OS HTML within ten minutes." >&2
           exit 1
 
       - name: Create checksum
@@ -92,12 +92,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view iso-v1.2.1-managed11 >/dev/null 2>&1; then
-            gh release create iso-v1.2.1-managed11 \
-              --title "A-OS Desktop bootable ISO" \
-              --notes "Bootable Debian Live image containing the same A-OS Desktop build and boot animation as the hosted website."
+          if ! gh release view iso-v1.2.1-classic1 >/dev/null 2>&1; then
+            gh release create iso-v1.2.1-classic1 \
+              --title "A-OS Desktop Classic bootable ISO" \
+              --notes "Bootable Debian Live image containing the classic A-OS artwork, original icons, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium mounts the packaged page."
           fi
-          gh release upload iso-v1.2.1-managed11 \
+          gh release upload iso-v1.2.1-classic1 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
             --clobber
