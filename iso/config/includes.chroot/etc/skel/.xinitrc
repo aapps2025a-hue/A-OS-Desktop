@@ -21,7 +21,11 @@ echo "AOS_LOCAL_SERVER_READY"
 ) &
 
 chromium_gpu_flags=""
-if grep -Eqi 'qemu|kvm' /sys/class/dmi/id/product_name 2>/dev/null; then
+if cat \
+  /sys/class/dmi/id/product_name \
+  /sys/class/dmi/id/sys_vendor \
+  /sys/class/dmi/id/board_vendor \
+  2>/dev/null | grep -Eqi 'qemu|kvm'; then
   chromium_gpu_flags="--disable-gpu"
 fi
 

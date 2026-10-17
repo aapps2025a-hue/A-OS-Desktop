@@ -48,7 +48,7 @@ jobs:
           sudo mv live-image-amd64.hybrid.iso ../A-OS-Desktop-amd64.iso
           sudo chown "$USER:$USER" ../A-OS-Desktop-amd64.iso
 
-      - name: Boot-test A-OS HTML in QEMU
+      - name: Boot-test packaged A-OS in QEMU
         run: |
           rm -f /tmp/aos-serial.log
           qemu-system-x86_64 \
@@ -64,7 +64,7 @@ jobs:
           trap 'kill "$qemu_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 300); do
             if grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-serial.log 2>/dev/null; then
-              echo "Chromium mounted the packaged A-OS HTML after boot."
+              echo "Chromium loaded and executed the packaged A-OS HTML after boot."
               exit 0
             fi
             if ! kill -0 "$qemu_pid" 2>/dev/null; then
@@ -74,7 +74,7 @@ jobs:
             sleep 2
           done
           cat /tmp/aos-serial.log
-          echo "Chromium did not mount the packaged A-OS HTML within ten minutes." >&2
+          echo "Chromium did not load the packaged A-OS HTML within ten minutes." >&2
           exit 1
 
       - name: Create checksum
@@ -96,7 +96,7 @@ jobs:
           if ! gh release view iso-v1.2.1-classic1 >/dev/null 2>&1; then
             gh release create iso-v1.2.1-classic1 \
               --title "A-OS Desktop hardware-enabled bootable ISO" \
-              --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium mounts the packaged page."
+              --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium loads and executes the packaged page."
           fi
           gh release upload iso-v1.2.1-classic1 \
             A-OS-Desktop-amd64.iso \
