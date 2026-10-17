@@ -9,7 +9,7 @@ lb config noauto \
   --binary-images iso-hybrid \
   --archive-areas "main non-free-firmware" \
   --apt-recommends true \
-  --compression zstd \
+  --compression gzip \
   --debian-installer none \
   --memtest none \
   --bootappend-live "boot=live components persistence quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8" \
