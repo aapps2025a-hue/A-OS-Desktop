@@ -49,7 +49,7 @@
     var icon = document.createElement("img");
     icon.src = new URL("./assets/icons/Settings.png", baseUrl).href;
     icon.alt = "";
-    var title = element("strong", "", "Device controls");
+    var title = element("strong", "", panelTab === "update" ? "A-OS Update" : "Device controls");
     var close = element("button", "aos-native-panel__close", "\u00d7");
     close.type = "button";
     close.setAttribute("aria-label", "Close");
@@ -57,12 +57,17 @@
     header.append(icon, title, close);
 
     var tabs = element("nav", "aos-native-panel__tabs");
-    [["wifi", "Wi-Fi"], ["bluetooth", "Bluetooth"]].forEach(function (entry) {
+    [["internet", "Internet"], ["wifi", "Wi-Fi"], ["bluetooth", "Bluetooth"], ["update", "Updates"]].forEach(function (entry) {
+      if (panelTab === "update") return;
       var button = element("button", "", entry[1]);
       button.type = "button";
       button.dataset.tab = entry[0];
       button.setAttribute("aria-selected", String(entry[0] === panelTab));
       button.addEventListener("click", function () {
+        if (entry[0] === "update") {
+          openUpdatePanel();
+          return;
+        }
         panelTab = entry[0];
         renderPanel();
       });
@@ -86,10 +91,13 @@
       toggle.disabled = true;
       Promise.resolve(onToggle(!enabled)).then(renderPanel).catch(nativeError);
     });
-    var refresh = element("button", "primary", "Scan");
-    refresh.type = "button";
-    refresh.addEventListener("click", onRefresh);
-    bar.append(status, toggle, refresh);
+    bar.append(status, toggle);
+    if (onRefresh) {
+      var refresh = element("button", "primary", "Scan");
+      refresh.type = "button";
+      refresh.addEventListener("click", onRefresh);
+      bar.appendChild(refresh);
+    }
     return bar;
   }
 
@@ -156,17 +164,22 @@
     panel = panelShell();
     var body = panel.querySelector(".aos-native-panel__body");
     var state = window.AOS_NATIVE_BRIDGE.state || {};
+    var isInternet = panelTab === "internet";
     var isWifi = panelTab === "wifi";
-    var enabled = isWifi ? Boolean(state.wifi && state.wifi.enabled) : Boolean(state.bluetooth && state.bluetooth.enabled);
+    var enabled = isInternet ? Boolean(state.networking && state.networking.enabled) : isWifi ? Boolean(state.wifi && state.wifi.enabled) : Boolean(state.bluetooth && state.bluetooth.enabled);
     body.appendChild(toolbar(
-      isWifi ? "Wi-Fi" : "Bluetooth",
+      isInternet ? "Internet access" : isWifi ? "Wi-Fi" : "Bluetooth",
       enabled,
       function (next) {
-        return isWifi ? window.aosNetworkBridge.toggle(next) : window.aosBluetoothBridge.toggle(next);
+        return isInternet ? window.aosNetworkBridge.toggleInternet(next) : isWifi ? window.aosNetworkBridge.toggle(next) : window.aosBluetoothBridge.toggle(next);
       },
-      function () { loadDevices(body, isWifi); }
+      isInternet ? null : function () { loadDevices(body, isWifi); }
     ));
-    loadDevices(body, isWifi);
+    if (isInternet) {
+      body.appendChild(element("p", "aos-native-empty", enabled ? "Internet access is enabled for Ethernet, Wi-Fi, A-OS apps, and embedded websites." : "Internet access is off. Local A-OS files and settings still work."));
+    } else {
+      loadDevices(body, isWifi);
+    }
   }
 
   function loadDevices(body, isWifi) {
@@ -194,6 +207,91 @@
   }
 
   window.AOS_OPEN_DEVICE_CONTROLS = openPanel;
+
+  function versionLabel(value) {
+    if (!value) return "Unavailable";
+    var version = value.version ? "A-OS " + value.version : "A-OS build";
+    var revision = String(value.revision || "");
+    if (/^[0-9a-f]{40}$/i.test(revision)) version += " (" + revision.slice(0, 8) + ")";
+    return version;
+  }
+
+  function updateProgress(body) {
+    body.innerHTML = "";
+    var message = element("p", "aos-native-update__message", "Preparing the A-OS update...");
+    var progress = element("div", "aos-native-update__progress");
+    var bar = element("span", "");
+    progress.appendChild(bar);
+    body.append(message, progress);
+    function poll() {
+      if (!panel || panelTab !== "update") return;
+      window.aosUpdateBridge.status().then(function (state) {
+        message.textContent = state.error || state.message || "Updating A-OS...";
+        bar.style.width = Math.max(0, Math.min(100, Number(state.progress || 0))) + "%";
+        if (state.stage === "complete") {
+          var restart = element("button", "primary", "Restart A-OS");
+          restart.type = "button";
+          restart.addEventListener("click", function () { confirmPower("restart"); });
+          body.appendChild(restart);
+          return;
+        }
+        if (state.stage === "error") {
+          var retry = element("button", "", "Back");
+          retry.type = "button";
+          retry.addEventListener("click", openUpdatePanel);
+          body.appendChild(retry);
+          return;
+        }
+        window.setTimeout(poll, 1000);
+      }).catch(function (error) {
+        message.textContent = error && error.message ? error.message : "A-OS lost contact with the updater.";
+        window.setTimeout(poll, 1800);
+      });
+    }
+    poll();
+  }
+
+  function openUpdatePanel() {
+    panelTab = "update";
+    closePanel();
+    panel = panelShell();
+    var body = panel.querySelector(".aos-native-panel__body");
+    body.appendChild(element("p", "aos-native-empty", "Checking for a newer A-OS build..."));
+    window.aosUpdateBridge.check().then(function (state) {
+      body.innerHTML = "";
+      var current = element("article", "aos-native-update__version");
+      current.append(element("small", "", "Installed"), element("b", "", versionLabel(state.packagedVersion)));
+      var latest = element("article", "aos-native-update__version");
+      latest.append(element("small", "", "Published"), element("b", "", versionLabel(state.remoteVersion)));
+      body.append(current, latest);
+      var sameRevision = state.packagedVersion && state.remoteVersion && state.packagedVersion.revision === state.remoteVersion.revision;
+      var installedTime = Date.parse(state.packagedVersion && state.packagedVersion.build || "");
+      var publishedTime = Date.parse(state.remoteVersion && state.remoteVersion.build || "");
+      var publishedIsOlder = Number.isFinite(installedTime) && Number.isFinite(publishedTime) && publishedTime <= installedTime;
+      if (sameRevision || publishedIsOlder) {
+        body.appendChild(element("p", "aos-native-empty", "This device already has the latest published A-OS files."));
+        return;
+      }
+      if (!state.remoteVersion) {
+        body.appendChild(element("p", "aos-native-update__warning", "A-OS could not reach the update service. Check Internet access and try again."));
+        return;
+      }
+      if (!state.persistent) {
+        body.appendChild(element("p", "aos-native-update__warning", "This is a live session. Install A-OS to a drive first if you want the update to survive a restart."));
+      }
+      body.appendChild(element("p", "aos-native-empty", "A-OS will download the exact published source revision and replace only the A-OS application files. Your accounts, settings, and files stay in place."));
+      var apply = element("button", "primary", "Download and install in background");
+      apply.type = "button";
+      apply.addEventListener("click", function () {
+        apply.disabled = true;
+        window.aosUpdateBridge.apply().then(function () { updateProgress(body); }).catch(function (error) {
+          apply.disabled = false;
+          nativeError(error);
+        });
+      });
+      body.appendChild(apply);
+    }).catch(nativeError);
+  }
 
   function updateQuickSettings(state) {
     document.querySelectorAll(".quick-tiles button").forEach(function (button) {
@@ -433,6 +531,7 @@
   window.addEventListener("aos-open-native-controls", function (event) {
     openPanel(event.detail && event.detail.tab || "wifi");
   });
+  window.addEventListener("aos-open-update", openUpdatePanel);
   window.addEventListener("aos-boot-complete", autoEnterAos);
   window.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && panel) closePanel();

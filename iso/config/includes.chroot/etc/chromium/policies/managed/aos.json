@@ -1,0 +1,14 @@
+{
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false,
+  "BrowserGuestModeEnabled": false,
+  "BrowserSignin": 0,
+  "DefaultBrowserSettingEnabled": false,
+  "DeveloperToolsAvailability": 2,
+  "IncognitoModeAvailability": 1,
+  "MetricsReportingEnabled": false,
+  "PasswordManagerEnabled": false,
+  "PromotionalTabsEnabled": false,
+  "SearchSuggestEnabled": false,
+  "ShowHomeButton": false
+}

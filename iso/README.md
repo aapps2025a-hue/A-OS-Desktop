@@ -8,8 +8,20 @@ A-OS Plymouth theme covers Linux startup; Chromium then plays the same
 `assets/os/A-OS Boot.gif` animation as the website and enters the A-OS setup
 automatically.
 
-The native bridge provides real NetworkManager Wi-Fi scanning and connection,
-BlueZ Bluetooth pairing, Linux battery status, and device restart/shutdown.
+The native bridge provides a master Internet switch, real NetworkManager Wi-Fi
+scanning and connection, BlueZ Bluetooth pairing, hardware battery status, and
+device restart/shutdown. The installation wizard can copy the hybrid image to
+a different physical drive and create a Debian Live persistence partition for
+A-OS accounts, settings, application data, and files. It refuses the drive the
+live system booted from and requires the exact target path to be typed before
+the selected drive is erased.
+
+The update indicator compares the packaged version with Firebase. An update is
+never installed automatically: after the user approves it, the native updater
+downloads the exact published Git commit, validates the archive paths, and
+updates only `/opt/a-os/public` in the background. A persistent installation is
+required for that update to survive a restart.
+
 Virtual machines only show physical Wi-Fi or Bluetooth devices when the host
 passes the corresponding hardware through to the guest. The live boot enables
 Debian Live persistence when the USB has a writable persistence partition.

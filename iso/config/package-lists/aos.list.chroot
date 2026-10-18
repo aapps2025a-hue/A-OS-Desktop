@@ -10,6 +10,11 @@ chromium
 python3
 curl
 ca-certificates
+parted
+gdisk
+e2fsprogs
+util-linux
+rsync
 dbus-x11
 network-manager
 wpasupplicant

@@ -103,7 +103,12 @@
       return;
     }
     window.dispatchEvent(new CustomEvent("aos-update-status", {
-      detail: {required: true, packagedVersion: packagedValue, remoteVersion: remoteValue}
+      detail: {
+        required: true,
+        packagedVersion: packagedValue,
+        remoteVersion: remoteValue,
+        persistent: Boolean(state && state.persistent)
+      }
     }));
     var key = "aos-native-update-" + remote;
     try {
@@ -111,7 +116,7 @@
       localStorage.setItem(key, "shown");
     } catch (_) {}
     window.dispatchEvent(new CustomEvent("aos-notification", {
-      detail: {message: "A newer A-OS Desktop build is online. Restart after updating the ISO to use it."}
+      detail: {message: "An A-OS update is ready. Open the update indicator to review and install it."}
     }));
   }
 
@@ -143,6 +148,24 @@
     },
     toggle: function (enabled) {
       return post("/__aos/wifi/toggle", {enabled: Boolean(enabled)}).then(refreshSystem);
+    },
+    toggleInternet: function (enabled) {
+      return post("/__aos/networking/toggle", {enabled: Boolean(enabled)}).then(refreshSystem);
+    }
+  };
+
+  window.aosUpdateBridge = {
+    check: function () {
+      return request("/__aos/update").then(function (state) {
+        checkRemoteUpdate(state);
+        return state;
+      });
+    },
+    status: function () {
+      return request("/__aos/update/status");
+    },
+    apply: function () {
+      return post("/__aos/update/apply", {});
     }
   };
 

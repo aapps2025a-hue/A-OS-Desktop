@@ -208,6 +208,41 @@
   transition: width 400ms ease;
 }
 
+.aos-installer__warning,
+.aos-installer__error {
+  margin: 18px 0 0;
+  border-left: 4px solid #d44735;
+  color: #64231c;
+  background: #fff1ef;
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+
+.aos-installer__error {
+  border-left-color: #b91c1c;
+  font-weight: 700;
+}
+
+.aos-installer__confirm {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  color: #253950;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.aos-installer__confirm input {
+  width: min(440px, 100%);
+  min-height: 42px;
+  border: 1px solid #aabcc8;
+  border-radius: 6px;
+  color: #14233a;
+  background: #fff;
+  padding: 9px 11px;
+  font: 600 14px ui-monospace, "Cascadia Mono", monospace;
+}
+
 .aos-live-iso .aos-native-setup-device {
   width: fit-content;
   margin: 0 0 18px !important;
@@ -445,6 +480,49 @@
   margin: 28px 0;
   color: #667889;
   text-align: center;
+}
+
+.aos-native-update__version {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 8px;
+  border: 1px solid #d8e4eb;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 12px 14px;
+}
+
+.aos-native-update__version small {
+  color: #667889;
+}
+
+.aos-native-update__warning {
+  border-left: 4px solid #d17b0f;
+  color: #62420f;
+  background: #fff8e7;
+  padding: 11px 13px;
+  line-height: 1.45;
+}
+
+.aos-native-update__message {
+  margin: 4px 0 12px;
+  color: #253950;
+}
+
+.aos-native-update__progress {
+  height: 8px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #dce8ee;
+}
+
+.aos-native-update__progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #0788d2;
+  transition: width 300ms ease;
 }
 
 .aos-native-browser-menu-button {

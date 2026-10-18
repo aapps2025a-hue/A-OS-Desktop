@@ -12,8 +12,7 @@ StandardOutput=journal
 StandardError=journal
 NoNewPrivileges=false
 ProtectHome=true
-ReadOnlyPaths=/opt/a-os/public
-ReadWritePaths=/tmp
+ReadWritePaths=/tmp /var/lib/aos /opt/a-os/public
 
 [Install]
 WantedBy=multi-user.target

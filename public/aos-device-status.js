@@ -77,7 +77,13 @@
     image.src = new URL("./assets/icons/" + iconName, baseUrl).href;
     image.alt = "";
     button.appendChild(image);
-    button.addEventListener("click", function () { notify(label); });
+    button.addEventListener("click", function () {
+      if (kind === "update") {
+        window.dispatchEvent(new CustomEvent("aos-open-update"));
+        return;
+      }
+      notify(label);
+    });
     return button;
   }
 
@@ -88,7 +94,7 @@
       root.className = "aos-device-status-corner";
       root.hidden = true;
       root.append(
-        statusButton("update", "Reboot.png", "An A-OS update is ready. Restart after updating to use it."),
+        statusButton("update", "Reboot.png", "An A-OS update is ready."),
         statusButton("microphone", "Record.png", "An app is using the microphone.")
       );
       var status = shelf.querySelector(":scope > .status");

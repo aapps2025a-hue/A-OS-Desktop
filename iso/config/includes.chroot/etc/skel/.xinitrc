@@ -45,13 +45,16 @@ while true; do
     --disable-domain-reliability \
     --disable-session-crashed-bubble \
     --disable-infobars \
+    --disable-prompt-on-repost \
+    --disable-search-engine-choice-screen \
     --disable-dev-shm-usage \
     --disable-translate \
     --disable-background-networking \
     --disable-component-update \
     --disable-sync \
     --disable-breakpad \
-    --disable-features=Translate,MediaRouter,ChromeWhatsNewUI,SidePanelPinning \
+    --disable-features=Translate,MediaRouter,ChromeWhatsNewUI,SidePanelPinning,OptimizationHints,AutofillServerCommunication \
+    --no-service-autorun \
     --autoplay-policy=no-user-gesture-required \
     --password-store=basic \
     --user-data-dir=/home/aos/.config/aos-runtime \

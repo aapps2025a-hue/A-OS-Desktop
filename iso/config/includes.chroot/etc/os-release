@@ -1,0 +1,9 @@
+PRETTY_NAME="A-OS Desktop 1.2.1"
+NAME="A-OS Desktop"
+VERSION_ID="1.2.1"
+VERSION="1.2.1"
+ID=a-os
+ID_LIKE=debian
+HOME_URL="https://a-os-desktop.web.app/"
+SUPPORT_URL="https://github.com/aapps2025a-hue/A-OS-Desktop/issues"
+BUG_REPORT_URL="https://github.com/aapps2025a-hue/A-OS-Desktop/issues"
