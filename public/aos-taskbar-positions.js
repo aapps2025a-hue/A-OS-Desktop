@@ -137,6 +137,7 @@
     var previous = document.getElementById(POWER_SCREEN_ID);
     if (previous) previous.remove();
     if (mode === "shutdown") localStorage.setItem(POWER_STATE_KEY, "off");
+    else if (mode === "hibernate") localStorage.setItem(POWER_STATE_KEY, "hibernating");
     else localStorage.removeItem(POWER_STATE_KEY);
     document.querySelectorAll("audio,video").forEach(function (media) {
       try { media.pause(); } catch (_) {}
@@ -144,13 +145,21 @@
     var screen = document.createElement("section");
     screen.id = POWER_SCREEN_ID;
     screen.className = "aos-lock-power-screen";
-    screen.innerHTML = '<img src="/assets/icons/OS Logo.png" alt=""><h1>' + (mode === "restart" ? "Restarting A-OS" : "A-OS is shut down") + '</h1><p>' + (mode === "restart" ? "Starting system services..." : "Press the power button to start this device.") + '</p>' + (mode === "shutdown" ? '<button type="button">Power on A-OS</button>' : '');
+    var heading = mode === "restart" ? "Restarting A-OS" : mode === "hibernate" ? "A-OS is hibernating" : "A-OS is shut down";
+    var message = mode === "restart" ? "Starting system services..." : mode === "hibernate" ? "Your open work is saved. Wake this device to continue where you left off." : "This browser session has powered off. Reload the page to start A-OS again.";
+    screen.innerHTML = '<img src="/assets/icons/OS Logo.png" alt=""><h1>' + heading + '</h1><p>' + message + '</p>' + (mode === "hibernate" ? '<button type="button">Wake A-OS</button>' : '');
     host.appendChild(screen);
     if (mode === "shutdown") {
       document.title = "A-OS is shut down";
+      window.setTimeout(function () { try { window.close(); } catch (_) {} }, 350);
+      return;
+    }
+    if (mode === "hibernate") {
+      document.title = "A-OS is hibernating";
       screen.querySelector("button").addEventListener("click", function () {
         localStorage.removeItem(POWER_STATE_KEY);
-        window.location.reload();
+        document.title = "A-OS Desktop v1.2.1";
+        screen.remove();
       });
       return;
     }
@@ -162,6 +171,7 @@
 
   function restorePowerState() {
     if (localStorage.getItem(POWER_STATE_KEY) === "off" && !document.getElementById(POWER_SCREEN_ID)) showPowerScreen(null, "shutdown");
+    if (localStorage.getItem(POWER_STATE_KEY) === "hibernating" && !document.getElementById(POWER_SCREEN_ID)) showPowerScreen(null, "hibernate");
   }
 
   function addLockPowerControls() {
@@ -169,7 +179,7 @@
       if (login.querySelector(".login-power-controls")) return;
       var controls = document.createElement("div");
       controls.className = "login-power-controls";
-      controls.innerHTML = '<button type="button" data-lock-power="restart"><img src="/assets/icons/Reboot.png" alt=""><span>Restart</span></button><button type="button" data-lock-power="shutdown"><img src="/assets/icons/Shutdown.png" alt=""><span>Shut down</span></button>';
+      controls.innerHTML = '<button type="button" data-lock-power="restart"><img src="/assets/icons/Reboot.png" alt=""><span>Restart</span></button><button type="button" data-lock-power="hibernate"><img src="/assets/icons/Shutdown.png" alt=""><span>Hibernate</span></button><button type="button" data-lock-power="shutdown"><img src="/assets/icons/Shutdown.png" alt=""><span>Shut down</span></button>';
       controls.addEventListener("click", function (event) {
         var button = event.target.closest("button[data-lock-power]");
         if (button) showPowerScreen(login, button.dataset.lockPower);
@@ -178,11 +188,30 @@
     });
   }
 
+  function addQuickHibernate() {
+    document.querySelectorAll(".quick-profile").forEach(function (profile) {
+      if (profile.querySelector("[data-aos-power='hibernate']")) return;
+      var shutdown = Array.from(profile.querySelectorAll("button")).find(function (button) {
+        return /shut down|shutdown/i.test(button.getAttribute("aria-label") || button.title || button.textContent || (button.querySelector("img") && button.querySelector("img").alt) || "");
+      });
+      if (!shutdown) return;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.dataset.aosPower = "hibernate";
+      button.setAttribute("aria-label", "Hibernate");
+      button.title = "Hibernate";
+      button.innerHTML = '<img src="/assets/icons/Shutdown.png" alt="Hibernate">';
+      button.addEventListener("click", function () { showPowerScreen(null, "hibernate"); });
+      shutdown.insertAdjacentElement("beforebegin", button);
+    });
+  }
+
   function enhance() {
     addSettingsControls();
     applyQuickButtonPreference();
     enhanceOsCenter();
     addLockPowerControls();
+    addQuickHibernate();
     restorePowerState();
   }
 

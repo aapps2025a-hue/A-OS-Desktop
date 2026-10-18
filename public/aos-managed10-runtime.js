@@ -236,6 +236,7 @@
       var baseline = safeGet(UPDATE_BASELINE_KEY);
       if (!baseline) {
         safeSet(UPDATE_BASELINE_KEY, identity);
+        if (!window.AOS_NATIVE_BRIDGE) window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: false}}));
         if (safeGet("aos-profile") && safeGet(UPDATE_NOTICE_KEY) !== identity) {
           safeSet(UPDATE_NOTICE_KEY, identity);
           notify("A-OS " + (data.version || "") + " has been updated with the latest improvements.");
@@ -245,7 +246,10 @@
       if (baseline !== identity && safeGet(UPDATE_NOTICE_KEY) !== identity) {
         safeSet(UPDATE_BASELINE_KEY, identity);
         safeSet(UPDATE_NOTICE_KEY, identity);
+        if (!window.AOS_NATIVE_BRIDGE) window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: true, version: data.version || ""}}));
         notify("A-OS " + (data.version || "") + " has been updated. Restart A-OS to use the latest version.");
+      } else {
+        if (!window.AOS_NATIVE_BRIDGE) window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: false}}));
       }
     } catch (_) {}
   }

@@ -3,6 +3,7 @@
 xset s off
 xset -dpms
 xset s noblank
+xsetroot -solid '#050607'
 
 openbox-session &
 rm -f /tmp/aos-browser-ready
@@ -33,9 +34,15 @@ while true; do
   chromium \
     $chromium_gpu_flags \
     --kiosk \
+    --start-fullscreen \
+    --app="http://127.0.0.1:5000/index.html?aosLiveIso=1" \
     --no-first-run \
     --no-default-browser-check \
     --noerrdialogs \
+    --disable-logging \
+    --log-level=3 \
+    --disable-crash-reporter \
+    --disable-domain-reliability \
     --disable-session-crashed-bubble \
     --disable-infobars \
     --disable-dev-shm-usage \
@@ -44,10 +51,10 @@ while true; do
     --disable-component-update \
     --disable-sync \
     --disable-breakpad \
-    --disable-features=Translate,MediaRouter \
+    --disable-features=Translate,MediaRouter,ChromeWhatsNewUI,SidePanelPinning \
     --autoplay-policy=no-user-gesture-required \
     --password-store=basic \
-    --user-data-dir=/home/aos/.config/aos-chromium \
-    "http://127.0.0.1:5000/index.html?aosLiveIso=1"
+    --user-data-dir=/home/aos/.config/aos-runtime \
+    >/dev/null 2>&1
   sleep 1
 done

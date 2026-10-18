@@ -28,6 +28,7 @@ fonts-dejavu-core
 fonts-liberation
 fonts-noto-color-emoji
 pipewire-audio
+pipewire-bin
 wireplumber
 alsa-utils
 plymouth

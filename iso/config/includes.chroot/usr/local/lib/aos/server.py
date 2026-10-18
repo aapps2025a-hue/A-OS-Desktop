@@ -103,13 +103,68 @@ def bluetooth_enabled():
     return code == 0 and bool(re.search(r"^\s*Powered:\s+yes\s*$", output, re.MULTILINE))
 
 
+def microphone_active():
+    code, uid, _ = run(["id", "-u", "aos"], timeout=2)
+    if code != 0 or not uid.isdigit():
+        return False
+    code, output, _ = run([
+        "runuser", "-u", "aos", "--", "env", "XDG_RUNTIME_DIR=/run/user/" + uid,
+        "pw-dump",
+    ], timeout=3)
+    if code != 0:
+        return False
+    try:
+        objects = json.loads(output)
+    except (TypeError, ValueError):
+        return False
+    for item in objects:
+        info = item.get("info") or {}
+        properties = info.get("props") or {}
+        if properties.get("media.class") == "Stream/Input/Audio" and info.get("state") == "running":
+            return True
+    return False
+
+
 def system_state():
     return {
         "native": True,
         "battery": battery_state(),
         "wifi": {"enabled": wifi_enabled(), "network": current_network()},
         "bluetooth": {"enabled": bluetooth_enabled()},
+        "microphoneActive": microphone_active(),
     }
+
+
+def storage_targets():
+    code, output, _ = run([
+        "lsblk", "--json", "--bytes", "--output",
+        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS",
+    ])
+    if code != 0:
+        return {"ok": True, "targets": []}
+    try:
+        devices = json.loads(output).get("blockdevices", [])
+    except (TypeError, ValueError):
+        return {"ok": True, "targets": []}
+    targets = []
+    for device in devices:
+        if device.get("type") != "disk":
+            continue
+        path = str(device.get("path") or ("/dev/" + str(device.get("name") or "")))
+        model = str(device.get("model") or "").strip()
+        transport = str(device.get("tran") or "").strip().upper()
+        removable = bool(device.get("rm")) or transport == "USB"
+        description = "Detected " + ("removable" if removable else "internal") + " drive"
+        if transport:
+            description += " | " + transport
+        targets.append({
+            "id": path,
+            "name": model or path,
+            "description": description,
+            "size": int(device.get("size") or 0),
+            "removable": removable,
+        })
+    return {"ok": True, "targets": targets}
 
 
 def split_nmcli(line):
@@ -224,6 +279,9 @@ class AosHandler(SimpleHTTPRequestHandler):
                     "remoteVersion": remote_version(),
                 })
                 return
+            if route == "/__aos/storage":
+                self._json(200, storage_targets())
+                return
             if route == "/__aos/wifi/scan":
                 self._json(200, wifi_scan())
                 return
@@ -296,8 +354,8 @@ class AosHandler(SimpleHTTPRequestHandler):
             self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error})
             return
 
-        if route in {"/__aos/power/restart", "/__aos/power/shutdown"}:
-            action = "reboot" if route.endswith("restart") else "poweroff"
+        if route in {"/__aos/power/restart", "/__aos/power/shutdown", "/__aos/power/hibernate"}:
+            action = "reboot" if route.endswith("restart") else "hibernate" if route.endswith("hibernate") else "poweroff"
             self._json(200, {"ok": True, "action": action})
             Timer(1.0, lambda: subprocess.run(["systemctl", action], check=False)).start()
             return

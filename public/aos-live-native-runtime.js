@@ -193,6 +193,8 @@
     renderPanel();
   }
 
+  window.AOS_OPEN_DEVICE_CONTROLS = openPanel;
+
   function updateQuickSettings(state) {
     document.querySelectorAll(".quick-tiles button").forEach(function (button) {
       var label = button.querySelector("b");
@@ -258,6 +260,9 @@
     frame.setAttribute("allowfullscreen", "");
 
     function install() {
+      try {
+        if (window.AOS_DEVICE_STATUS) window.AOS_DEVICE_STATUS.instrumentWindow(frame.contentWindow);
+      } catch (_) {}
       loadEmojiAssets().then(function (catalogs) {
         var childWindow;
         var childDocument;
@@ -366,17 +371,43 @@
     var windowNode = element("section", "aos-native-panel__window");
     windowNode.style.width = "min(430px, 100%)";
     var header = element("header", "aos-native-panel__header");
-    var title = element("strong", "", action === "restart" ? "Restart A-OS?" : "Shut down A-OS?");
+    var titles = {
+      restart: "Restart A-OS?",
+      shutdown: "Shut down A-OS?",
+      hibernate: "Hibernate A-OS?"
+    };
+    var descriptions = {
+      restart: "Open work will be closed and the real device will restart.",
+      shutdown: "Open work will be closed and the real device will power off.",
+      hibernate: "A-OS will save this session, turn off, and restore your open work when the device wakes."
+    };
+    var labels = {restart: "Restart", shutdown: "Shut down", hibernate: "Hibernate"};
+    var title = element("strong", "", titles[action]);
     header.appendChild(title);
     var body = element("main", "aos-native-panel__body");
-    body.appendChild(element("p", "", action === "restart" ? "Open work will be closed and the real device will restart." : "Open work will be closed and the real device will power off."));
+    body.appendChild(element("p", "", descriptions[action]));
     var actions = element("div", "aos-native-panel__toolbar");
     var cancel = element("button", "", "Cancel");
-    var proceed = element("button", "primary", action === "restart" ? "Restart" : "Shut down");
+    var proceed = element("button", "primary", labels[action]);
     cancel.addEventListener("click", function () { overlay.remove(); });
     proceed.addEventListener("click", function () {
       proceed.disabled = true;
-      window.AOS_NATIVE_BRIDGE.post("/__aos/power/" + action, {}).catch(nativeError);
+      try {
+        localStorage.setItem("aos-last-power-action", JSON.stringify({action: action, at: Date.now()}));
+      } catch (_) {}
+      window.dispatchEvent(new CustomEvent("aos-before-power", {detail: {action: action}}));
+      window.AOS_NATIVE_BRIDGE.post("/__aos/power/" + action, {}).then(function () {
+        overlay.innerHTML = "";
+        var state = element("section", "aos-native-power-state");
+        var logo = document.createElement("img");
+        logo.src = new URL("./assets/icons/OS Logo.png", baseUrl).href;
+        logo.alt = "";
+        state.append(logo, element("h1", "", action === "hibernate" ? "Saving your A-OS session" : action === "restart" ? "Restarting A-OS" : "Shutting down A-OS"));
+        overlay.appendChild(state);
+      }).catch(function (error) {
+        proceed.disabled = false;
+        nativeError(error);
+      });
     });
     actions.append(cancel, proceed);
     body.appendChild(actions);
@@ -389,15 +420,18 @@
     var button = event.target && event.target.closest && event.target.closest("button");
     if (!button || button.closest(".aos-native-panel")) return;
     var label = (button.getAttribute("aria-label") || button.title || button.textContent || "").trim().toLowerCase();
-    if (label === "restart" || label === "shut down" || label === "shutdown") {
+    if (/^(restart|shut down|shutdown|hibernate)$/.test(label)) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      confirmPower(label === "restart" ? "restart" : "shutdown");
+      confirmPower(label === "restart" ? "restart" : label === "hibernate" ? "hibernate" : "shutdown");
     }
   }, true);
 
   window.addEventListener("aos-native-system", function (event) {
     updateQuickSettings(event.detail || {});
+  });
+  window.addEventListener("aos-open-native-controls", function (event) {
+    openPanel(event.detail && event.detail.tab || "wifi");
   });
   window.addEventListener("aos-boot-complete", autoEnterAos);
   window.addEventListener("keydown", function (event) {

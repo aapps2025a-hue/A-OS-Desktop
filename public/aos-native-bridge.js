@@ -86,13 +86,25 @@
   function checkRemoteUpdate(state) {
     var packagedValue = state && state.packagedVersion;
     var remoteValue = state && state.remoteVersion;
-    if (packagedValue && remoteValue && packagedValue.revision && packagedValue.revision === remoteValue.revision) return;
+    if (packagedValue && remoteValue && packagedValue.revision && packagedValue.revision === remoteValue.revision) {
+      window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: false}}));
+      return;
+    }
     var packaged = versionIdentity(state && state.packagedVersion);
     var remote = versionIdentity(state && state.remoteVersion);
-    if (!packaged || !remote || packaged === remote) return;
+    if (!packaged || !remote || packaged === remote) {
+      window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: false}}));
+      return;
+    }
     var packagedTime = Date.parse(packagedValue && packagedValue.build || "");
     var remoteTime = Date.parse(remoteValue && remoteValue.build || "");
-    if (Number.isFinite(packagedTime) && Number.isFinite(remoteTime) && remoteTime <= packagedTime) return;
+    if (Number.isFinite(packagedTime) && Number.isFinite(remoteTime) && remoteTime <= packagedTime) {
+      window.dispatchEvent(new CustomEvent("aos-update-status", {detail: {required: false}}));
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("aos-update-status", {
+      detail: {required: true, packagedVersion: packagedValue, remoteVersion: remoteValue}
+    }));
     var key = "aos-native-update-" + remote;
     try {
       if (localStorage.getItem(key)) return;
