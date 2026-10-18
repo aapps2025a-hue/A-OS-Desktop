@@ -8,8 +8,8 @@ Type=simple
 ExecStart=/usr/local/lib/aos/start-session.sh
 Restart=always
 RestartSec=2
-StandardOutput=journal
-StandardError=journal
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
