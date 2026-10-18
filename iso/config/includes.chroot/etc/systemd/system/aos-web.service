@@ -9,10 +9,12 @@ ExecStart=/usr/local/lib/aos/server.py
 Restart=always
 RestartSec=1
 StandardOutput=journal
-StandardError=journal
+StandardError=journal+console
 NoNewPrivileges=false
 ProtectHome=true
-ReadWritePaths=/tmp /var/lib/aos /opt/a-os/public
+StateDirectory=aos
+StateDirectoryMode=0755
+ReadWritePaths=/tmp /opt/a-os/public
 
 [Install]
 WantedBy=multi-user.target
