@@ -1,0 +1,73 @@
+name: Build A-Store app APKs
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "android/astore/**"
+      - "scripts/build-astore-apks.mjs"
+      - ".github/workflows/build-astore-apps.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: astore-app-apks
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Restore A-Store signing key
+        env:
+          ASTORE_KEYSTORE_BASE64: ${{ secrets.ASTORE_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ASTORE_KEYSTORE_BASE64"
+          printf '%s' "$ASTORE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/astore-apps.jks"
+
+      - name: Build one signed APK per A-Store app
+        env:
+          ASTORE_KEYSTORE_PATH: ${{ runner.temp }}/astore-apps.jks
+          ASTORE_KEYSTORE_PASSWORD: ${{ secrets.ASTORE_KEYSTORE_PASSWORD }}
+          ASTORE_KEY_ALIAS: ${{ secrets.ASTORE_KEY_ALIAS }}
+          ASTORE_KEY_PASSWORD: ${{ secrets.ASTORE_KEY_PASSWORD }}
+        run: |
+          chmod +x android/astore/gradlew
+          node scripts/build-astore-apks.mjs --output dist/astore-apks
+
+      - name: Publish current app packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view astore-apps >/dev/null 2>&1; then
+            gh release create astore-apps --title "A-Store Android apps" --notes "Individually installable Android packages generated from the current A-Store catalog. Every app has its own stable Android identity, and updated versions retain that identity."
+          fi
+          gh release upload astore-apps dist/astore-apks/* --clobber
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: A-Store-app-APKs
+          path: dist/astore-apks
+          retention-days: 14

@@ -76,6 +76,43 @@ service cloud.firestore {
     }
    }
   }
+
+  function storeEnvelopeValid(ownerUid) {
+   let d = request.resource.data;
+   return request.auth != null
+    && d.keys().hasOnly(['ownerUid','payload','downloads','publishedAt','updatedAt','showcaseUntil'])
+    && d.ownerUid == ownerUid
+    && d.payload is string
+    && d.payload.size() > 20
+    && d.payload.size() < 720000
+    && d.downloads is int
+    && d.downloads >= 0
+    && d.publishedAt is int
+    && d.updatedAt is int
+    && d.showcaseUntil is int;
+  }
+
+  // Public A-Store catalog. Publishing requires an A-Applications account.
+  // show-off selection is admin-only: clients must preserve showcaseUntil.
+  match /aosStoreApps/{slug} {
+   allow read: if true;
+   allow create: if owner(request.auth.uid)
+    && storeEnvelopeValid(request.auth.uid)
+    && request.resource.data.downloads == 0
+    && request.resource.data.showcaseUntil == 0;
+   allow update: if (
+     owner(resource.data.ownerUid)
+     && storeEnvelopeValid(resource.data.ownerUid)
+     && request.resource.data.downloads == resource.data.downloads
+     && request.resource.data.publishedAt == resource.data.publishedAt
+     && request.resource.data.showcaseUntil == resource.data.showcaseUntil
+    ) || (
+     request.auth != null
+     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['downloads'])
+     && request.resource.data.downloads == resource.data.downloads + 1
+    );
+   allow delete: if owner(resource.data.ownerUid);
+  }
   match /{allPaths=**} { allow read,write: if false; }
  }
 }

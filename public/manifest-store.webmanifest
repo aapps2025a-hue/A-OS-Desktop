@@ -1,0 +1,15 @@
+{
+  "name": "A-Store",
+  "short_name": "A-Store",
+  "description": "Discover, install, and update A-OS apps.",
+  "id": "/store.html",
+  "start_url": "/store.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef5f8",
+  "theme_color": "#087fb9",
+  "icons": [
+    {"src": "/assets/icons/Downloads.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

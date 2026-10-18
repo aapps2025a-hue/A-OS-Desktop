@@ -1,0 +1,15 @@
+{
+  "name": "A-Store Dev",
+  "short_name": "Store Dev",
+  "description": "Build and publish HTML apps to A-Store.",
+  "id": "/store-dev.html",
+  "start_url": "/store-dev.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#09131d",
+  "theme_color": "#09131d",
+  "icons": [
+    {"src": "/assets/icons/Code.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

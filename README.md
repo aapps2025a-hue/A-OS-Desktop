@@ -26,6 +26,42 @@ Then open `http://127.0.0.1:5000/`.
 Opening `public/index.html` directly with a `file:` URL is not supported because
 browser security rules block parts of the module and storage system.
 
+## A-Store
+
+- `public/store.html` is the standalone A-Store for browsers and Windows app installation.
+- `public/store-dev.html` opens A-Store Dev directly.
+- `public/downloads/A-Store-Android.apk` is the local Android build artifact.
+- The public APK is distributed from the `astore-android-v1.0.0` GitHub release because Firebase's Spark plan blocks executable uploads.
+- `android/astore/app` contains the Android A-Store client.
+- `android/astore/storeapp` is the native host used to build a separate APK for each catalog app.
+- `.github/workflows/build-astore-apps.yml` scans the catalog every five minutes, builds signed APKs, and publishes them in the `astore-apps` GitHub release.
+
+A-Store Dev can import a folder containing `index.html`, edit HTML, CSS,
+JavaScript, JSON, and local backend routes, attach a logo and preview media,
+scan the package, and publish or update it through the shared Firestore catalog.
+Publishing requires an A-Applications account. New apps appear in the catalog
+immediately but retain a reputation warning until they qualify for the active
+top-1,000 list. The home promotion area contains only administrator-selected
+one-week show-off apps or highly downloaded apps.
+
+On Android, A-Store installs each catalog item as a separate application with a
+stable package identity. Updating an app keeps that identity and its Android
+data. The signing key is stored only in GitHub Actions secrets; it is not part
+of this repository.
+
+Build the Android package with Android Studio or:
+
+```powershell
+cd android/astore
+./gradlew assembleDebug
+```
+
+To test one generated app locally:
+
+```powershell
+node scripts/build-astore-apks.mjs --debug --only a-ai --output dist/astore-apks
+```
+
 ## Assets
 
 Runtime assets live in these folders:

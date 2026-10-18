@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en" data-aos-store-standalone="true">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#09131d">
+    <meta name="description" content="Build and publish HTML apps to A-Store.">
+    <title>A-Store Dev</title>
+    <link rel="icon" type="image/png" href="./assets/icons/Code.png">
+    <link rel="manifest" href="./manifest-store-dev.webmanifest">
+    <link rel="stylesheet" href="./aos-store-platform.css?v=20261018-store2">
+  </head>
+  <body class="astore-standalone-body">
+    <div data-astore-root></div>
+    <script src="./aos-store-platform.js?v=20261018-store2"></script>
+    <script>
+      window.addEventListener("load", function () {
+        window.setTimeout(function () {
+          if (window.AOS_STORE_PLATFORM) window.AOS_STORE_PLATFORM.openDeveloper();
+        }, 50);
+      });
+    </script>
+  </body>
+</html>

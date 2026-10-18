@@ -2,6 +2,7 @@
 firebase-debug.log
 firebase-debug.*.log
 node_modules/
+dist/
 _site/
 .DS_Store
 Thumbs.db
@@ -15,4 +16,9 @@ Thumbs.db
 public/assets/icons/s9_over_the_horizon.mp3
 public/assets/media/s9_over_the_horizon.mp3
 chrome-managed11.png
+
+# Local Android/Gradle state and generated build directories.
+android/**/.gradle/
+android/**/build/
+android/**/local.properties
 
