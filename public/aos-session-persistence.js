@@ -103,15 +103,24 @@
   }
 
   function restoreWhenReady(snapshot) {
-    var attempts = 0;
+    var restored = false;
+    var observer = new MutationObserver(tryRestore);
     var timer = window.setInterval(function () {
-      attempts += 1;
-      if (!desktopReady() && attempts < 600) return;
+      tryRestore();
+    }, 1000);
+
+    function tryRestore() {
+      if (restored || !desktopReady()) return;
+      restored = true;
       window.clearInterval(timer);
-      if (desktopReady()) restoreOpenApps(snapshot);
+      observer.disconnect();
+      restoreOpenApps(snapshot);
       try { localStorage.removeItem(PENDING_KEY); } catch (_) {}
       window.dispatchEvent(new CustomEvent("aos-session-restored", {detail: snapshot}));
-    }, 200);
+    }
+
+    observer.observe(document.documentElement, {childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style", "hidden"]});
+    tryRestore();
   }
 
   var initialSnapshot = readSnapshot();
