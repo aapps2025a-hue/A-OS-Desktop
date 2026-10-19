@@ -142,11 +142,22 @@ jobs:
           sudo losetup -d "$loop_device"
           loop_device=""
           rm -f /tmp/aos-installed-serial.log
+          if [ -f /usr/share/OVMF/OVMF_CODE_4M.fd ]; then
+            ovmf_code=/usr/share/OVMF/OVMF_CODE_4M.fd
+            ovmf_vars_template=/usr/share/OVMF/OVMF_VARS_4M.fd
+          else
+            ovmf_code=/usr/share/OVMF/OVMF_CODE.fd
+            ovmf_vars_template=/usr/share/OVMF/OVMF_VARS.fd
+          fi
+          test -f "$ovmf_code"
+          test -f "$ovmf_vars_template"
+          cp "$ovmf_vars_template" /tmp/aos-ovmf-vars.fd
           qemu-system-x86_64 \
             -machine accel=tcg \
             -m 3072 \
             -smp 2 \
-            -bios /usr/share/OVMF/OVMF_CODE.fd \
+            -drive if=pflash,format=raw,readonly=on,file="$ovmf_code" \
+            -drive if=pflash,format=raw,file=/tmp/aos-ovmf-vars.fd \
             -drive file="$disk",format=raw,if=virtio \
             -boot c \
             -display none \
