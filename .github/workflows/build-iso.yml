@@ -7,6 +7,7 @@ on:
     paths:
       - "iso/**"
       - "public/**"
+      - "scripts/smoke-apps.mjs"
       - ".github/workflows/build-iso.yml"
 
 permissions:
@@ -23,6 +24,11 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
       - name: Install Debian Live tools
         run: |
@@ -41,6 +47,15 @@ jobs:
           rm -rf iso/config/includes.chroot/opt/a-os/public
           mkdir -p iso/config/includes.chroot/opt/a-os/public
           cp -a public/. iso/config/includes.chroot/opt/a-os/public/
+
+      - name: Launch the packaged A-OS apps in Chrome
+        run: |
+          set -euo pipefail
+          python3 -m http.server 8765 --directory public >/tmp/aos-app-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          chrome_bin=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
+          AOS_CHROME_BIN="$chrome_bin" node scripts/smoke-apps.mjs
 
       - name: Build bootable ISO hybrid
         working-directory: iso
@@ -129,13 +144,14 @@ jobs:
           spec.loader.exec_module(server)
           print(server.grub_configuration(sys.argv[1], sys.argv[2]), end="")
           PY
-          sudo mkdir -p "$efi_mount/EFI/BOOT"
+          sudo mkdir -p "$efi_mount/EFI/BOOT" "$efi_mount/EFI/AOSDesktop"
+          sudo cp iso/config/includes.chroot/usr/share/plymouth/themes/aos/aos-boot.png "$efi_mount/EFI/AOSDesktop/splash.png"
           sudo grub-mkstandalone \
             --format=x86_64-efi \
             --output="$efi_mount/EFI/BOOT/BOOTX64.EFI" \
             --locales= \
-            --fonts= \
-            --modules="part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain" \
+            --fonts=unicode \
+            --modules="part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain gfxterm png efi_gop" \
             "boot/grub/grub.cfg=/tmp/aos-installed-grub.cfg"
           sudo sync
           sudo umount "$efi_mount" "$data_mount" "$system_mount" "$iso_mount"

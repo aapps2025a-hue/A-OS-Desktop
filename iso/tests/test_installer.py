@@ -47,7 +47,9 @@ class InstallerSafetyTests(unittest.TestCase):
         config = SERVER.grub_configuration("aos-system-uuid", "windows-esp-uuid")
         self.assertIn("menuentry 'A-OS Desktop'", config)
         self.assertIn("live-media=/dev/disk/by-uuid/aos-system-uuid", config)
+        self.assertIn("reboot=efi", config)
         self.assertIn("($aosroot)/live/vmlinuz", config)
+        self.assertIn("/EFI/AOSDesktop/splash.png", config)
         self.assertIn("menuentry 'Windows Boot Manager'", config)
         self.assertIn("/EFI/Microsoft/Boot/bootmgfw.efi", config)
 

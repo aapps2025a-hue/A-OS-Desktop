@@ -12,7 +12,7 @@ lb config noauto \
   --compression gzip \
   --debian-installer none \
   --memtest none \
-  --bootappend-live "boot=live components persistence quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8" \
+  --bootappend-live "boot=live components persistence quiet splash reboot=efi loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8" \
   --iso-application "A-OS Desktop" \
   --iso-publisher "A-OS Open Source" \
   --iso-volume "A-OS Desktop 1.2.1" \

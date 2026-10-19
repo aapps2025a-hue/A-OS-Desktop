@@ -57,7 +57,9 @@
     header.append(icon, title, close);
 
     var tabs = element("nav", "aos-native-panel__tabs");
-    [["internet", "Internet"], ["wifi", "Wi-Fi"], ["bluetooth", "Bluetooth"], ["update", "Updates"]].forEach(function (entry) {
+    var entries = [["internet", "Internet"], ["wifi", "Wi-Fi"], ["bluetooth", "Bluetooth"], ["update", "Updates"]];
+    if (!(window.AOS_NATIVE_BRIDGE.state || {}).persistent) entries.push(["install", "Install"]);
+    entries.forEach(function (entry) {
       if (panelTab === "update") return;
       var button = element("button", "", entry[1]);
       button.type = "button";
@@ -66,6 +68,15 @@
       button.addEventListener("click", function () {
         if (entry[0] === "update") {
           openUpdatePanel();
+          return;
+        }
+        if (entry[0] === "install") {
+          closePanel();
+          if (window.AOS_INSTALLATION_WIZARD && typeof window.AOS_INSTALLATION_WIZARD.open === "function") {
+            window.AOS_INSTALLATION_WIZARD.open();
+          } else {
+            nativeError(new Error("The A-OS installer is not available."));
+          }
           return;
         }
         panelTab = entry[0];

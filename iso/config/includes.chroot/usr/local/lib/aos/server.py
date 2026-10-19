@@ -524,18 +524,28 @@ def aos_boot_entries():
 def grub_configuration(system_uuid, esp_uuid):
     return """set timeout=8
 set default=0
+search --no-floppy --fs-uuid --set=winboot %s
+if loadfont unicode; then
+    insmod gfxterm
+    insmod png
+    insmod efi_gop
+    terminal_output gfxterm
+    if background_image ($winboot)/EFI/AOSDesktop/splash.png; then
+        set color_normal=white/black
+        set color_highlight=black/light-gray
+    fi
+fi
 
 menuentry 'A-OS Desktop' {
     search --no-floppy --fs-uuid --set=aosroot %s
-    linux ($aosroot)/live/vmlinuz boot=live components persistence live-media=/dev/disk/by-uuid/%s live-media-path=/live quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8 noeject
+    linux ($aosroot)/live/vmlinuz boot=live components persistence live-media=/dev/disk/by-uuid/%s live-media-path=/live quiet splash reboot=efi loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8 noeject
     initrd ($aosroot)/live/initrd.img
 }
 
 menuentry 'Windows Boot Manager' {
-    search --no-floppy --fs-uuid --set=winboot %s
     chainloader ($winboot)/EFI/Microsoft/Boot/bootmgfw.efi
 }
-""" % (system_uuid, system_uuid, esp_uuid)
+""" % (esp_uuid, system_uuid, system_uuid)
 
 
 def install_alongside_worker(target):
@@ -616,6 +626,10 @@ def install_alongside_worker(target):
         if efi_directory.exists():
             raise RuntimeError("An existing A-OS UEFI loader was found; remove the old A-OS installation first")
         efi_directory.mkdir(parents=True)
+        shutil.copyfile(
+            "/usr/share/plymouth/themes/aos/aos-boot.png",
+            efi_directory / "splash.png",
+        )
         grub_file = mount_root / "grub.cfg"
         grub_file.write_text(
             grub_configuration(filesystem_uuid(system_partition), filesystem_uuid(item["esp"])),
@@ -624,8 +638,8 @@ def install_alongside_worker(target):
         require_command([
             "grub-mkstandalone", "--format=x86_64-efi",
             "--output=" + str(efi_directory / "grubx64.efi"),
-            "--locales=", "--fonts=",
-            "--modules=part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain",
+            "--locales=", "--fonts=unicode",
+            "--modules=part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain gfxterm png efi_gop",
             "boot/grub/grub.cfg=" + str(grub_file),
         ], timeout=180)
 
@@ -819,7 +833,6 @@ def update_worker(version):
 
 
 def finish_power_action(action):
-    subprocess.run(["systemctl", "stop", "aos-session.service"], check=False)
     subprocess.run(["sync"], check=False)
     subprocess.run(["systemctl", "reboot" if action == "restart" else "poweroff"], check=False)
 

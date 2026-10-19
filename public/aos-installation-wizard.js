@@ -2,7 +2,6 @@
   "use strict";
 
   if (!window.AOS_NATIVE_BRIDGE || window.AOS_INSTALLATION_WIZARD) return;
-  window.AOS_INSTALLATION_WIZARD = true;
 
   var COMPLETE_KEY = "aos-native-installation-complete-v3";
   var TARGET_KEY = "aos-native-installation-target";
@@ -236,8 +235,8 @@
     windowNode.appendChild(sidebar);
   }
 
-  function show() {
-    if (!shouldShow() || overlay || !document.body) return;
+  function show(force) {
+    if ((!force && !shouldShow()) || overlay || !document.body) return;
     targets = [{id: "live", mode: "live", name: "A-OS live system", description: "Try A-OS without changing this computer", size: "Safe option", removable: false, installable: true}];
     overlay = element("section", "aos-installer");
     overlay.id = "aos-installation-wizard";
@@ -261,8 +260,17 @@
     }).catch(function () {});
   }
 
-  window.addEventListener("aos-boot-complete", show, {once: true});
+  window.AOS_INSTALLATION_WIZARD = {
+    open: function () { show(true); },
+    close: function () {
+      window.clearTimeout(pollTimer);
+      if (overlay) overlay.remove();
+      overlay = null;
+    }
+  };
+
+  window.addEventListener("aos-boot-complete", function () { show(false); }, {once: true});
   window.setTimeout(function () {
-    if (!document.getElementById("aos-boot-sequence")) show();
+    if (!document.getElementById("aos-boot-sequence")) show(false);
   }, 5600);
 })();

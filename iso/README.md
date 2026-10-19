@@ -4,9 +4,12 @@ This directory is the complete, open-source Debian Live configuration for the
 A-OS Desktop ISO. The image boots a lightweight Linux session, starts a
 localhost-only web and hardware bridge, opens Chromium in kiosk mode, and loads
 the same `public/index.html` build used by Firebase and GitHub Pages. A quiet
-A-OS Plymouth theme covers Linux startup; Chromium then plays the same
-`assets/os/A-OS Boot.gif` animation as the website and enters the A-OS setup
-automatically.
+A-OS Plymouth theme covers Linux startup. The UEFI loader and Plymouth use the
+exact first frame of `assets/os/A-OS Boot.gif`; Chromium then plays the complete
+GIF once and fades into A-OS. Firmware bootloaders cannot animate GIF files, so
+this keeps the artwork continuous without exposing Debian or Chromium. Rufus
+only writes the hybrid image and does not display or animate an operating-system
+splash itself.
 
 The native bridge provides a master Internet switch, real NetworkManager Wi-Fi
 scanning and connection, BlueZ Bluetooth pairing, hardware battery status, and
@@ -56,5 +59,6 @@ The result is `live-image-amd64.hybrid.iso`. It is an ISO-hybrid image suitable
 for a virtual machine, DVD, or writing directly to a USB drive. The GitHub
 workflow runs the installer unit tests, builds it in a clean runner, boots it
 in QEMU from both the ISO and a generated installed UEFI disk until the real
-packaged HTML reports ready, publishes a checksum, and uploads the ISO to the
+packaged HTML reports ready, and launches the core A-OS apps in headless Chrome.
+Only then does it publish a checksum and upload the ISO to the
 `iso-v1.2.1-classic1` release.
