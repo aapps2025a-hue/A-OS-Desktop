@@ -613,3 +613,6 @@ body:has(.desktop.dark-mode) .aos-complete-emoji-overlay {
     height: 31px;
   }
 }
+[data-aos-home-system-hidden="true"] {
+  display: none !important;
+}

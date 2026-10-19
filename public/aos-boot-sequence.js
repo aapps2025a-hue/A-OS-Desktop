@@ -13,7 +13,7 @@
     "html.aos-is-booting, html.aos-is-booting body { background:#06111f !important; overflow:hidden !important; }",
     "#aos-boot-sequence { position:fixed; inset:0; z-index:2147483647; display:grid; place-items:center; background:#06111f; opacity:1; transition:opacity 700ms ease; }",
     "#aos-boot-sequence.aos-boot-fade { opacity:0; pointer-events:none; }",
-    "#aos-boot-sequence img { width:1152px; height:648px; max-width:100vw; max-height:100vh; object-fit:contain; display:block; }",
+    "#aos-boot-sequence img { width:100%; height:100%; object-fit:cover; display:block; }",
     "@media (prefers-reduced-motion: reduce) { #aos-boot-sequence { transition-duration:240ms; } }"
   ].join("");
 

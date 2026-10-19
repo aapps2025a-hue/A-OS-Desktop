@@ -171,8 +171,53 @@
       wireEmbedAlert(frame);
       if (frame.title === "A-OS Weather Station") removeWeatherExternalLink(frame);
     });
+    hideSystemFilesFromHome();
     decorateEmojiPack();
     removeAosPackageUpload();
+  }
+
+  function systemFileNames() {
+    var names = new Set(["OS", "index.html", "Welcome.txt"]);
+    try {
+      var files = JSON.parse(safeGet("aos-files") || "[]");
+      files.forEach(function (file) {
+        var id = String(file && file.id || "");
+        var mime = String(file && file.mime || "");
+        if (id.indexOf("os-") === 0 || /system/i.test(mime)) {
+          names.add(String(file.name || ""));
+        }
+      });
+    } catch (_) {}
+    return names;
+  }
+
+  function hideSystemFilesFromHome() {
+    document.querySelectorAll('[data-aos-home-system-hidden="true"]').forEach(function (item) {
+      item.removeAttribute("data-aos-home-system-hidden");
+    });
+
+    document.querySelectorAll('input[placeholder="Search files and folders..."]').forEach(function (search) {
+      var main = search.closest("main");
+      var windowShell = search.closest(".system-window");
+      if (!main || !windowShell) return;
+
+      var isHome = Array.from(windowShell.querySelectorAll("span, div")).some(function (item) {
+        return /^C:\/\/Users\/[^/]+\/Home$/.test((item.textContent || "").trim());
+      });
+      if (!isHome) return;
+
+      var names = systemFileNames();
+      main.querySelectorAll("h4, span").forEach(function (label) {
+        if (!names.has((label.textContent || "").trim())) return;
+
+        var item = label.closest("div.group.relative") ||
+          label.closest("div.cursor-pointer.rounded-lg") ||
+          label.closest("button");
+        if (item && main.contains(item)) {
+          item.setAttribute("data-aos-home-system-hidden", "true");
+        }
+      });
+    });
   }
 
   function removeWeatherExternalLink(frame) {
