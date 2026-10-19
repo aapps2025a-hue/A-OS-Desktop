@@ -4,6 +4,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread, Timer
 from urllib.request import Request, urlopen
+import hashlib
 import json
 import math
 import os
@@ -32,6 +33,10 @@ UPDATE_LOCK = Lock()
 INSTALL_LOCK = Lock()
 UPDATE_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
 INSTALL_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
+MIB = 1024 * 1024
+GIB = 1024 * MIB
+MIN_ALONGSIDE_BYTES = 32 * GIB
+EFI_SYSTEM_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 os.chdir(PACKAGED_ROOT)
 
 
@@ -215,7 +220,10 @@ def live_source_device():
 
 
 def block_devices():
-    code, output, _ = run(["lsblk", "--json", "--bytes", "--output", "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START"])
+    code, output, _ = run([
+        "lsblk", "--json", "--bytes", "--output",
+        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTN,PTTYPE",
+    ])
     if code != 0:
         return []
     try:
@@ -224,11 +232,119 @@ def block_devices():
         return []
 
 
+def parse_parted_free(output):
+    """Return MiB-aligned free regions from machine-readable parted output."""
+    regions = []
+    pattern = re.compile(r"^\d*:(\d+)B:(\d+)B:(\d+)B:free(?::.*)?;$")
+    for line in str(output or "").splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        raw_start, raw_end, _ = (int(value) for value in match.groups())
+        start_mib = int(math.ceil(raw_start / MIB))
+        end_mib = int(math.floor((raw_end + 1) / MIB))
+        if end_mib > start_mib:
+            regions.append({
+                "startMiB": start_mib,
+                "endMiB": end_mib,
+                "size": (end_mib - start_mib) * MIB,
+            })
+    return regions
+
+
+def disk_free_regions(device):
+    code, output, _ = run(["parted", "-m", "-s", device, "unit", "B", "print", "free"], timeout=10)
+    return parse_parted_free(output) if code == 0 else []
+
+
+def mounted_path(partition):
+    code, output, _ = run(["findmnt", "-n", "-o", "TARGET", "--source", partition], timeout=3)
+    return output.splitlines()[0].strip() if code == 0 and output.strip() else ""
+
+
+def partition_has_windows_loader(partition):
+    existing = mounted_path(partition)
+    mount_dir = None
+    try:
+        if existing:
+            root = Path(existing)
+        else:
+            mount_dir = Path(tempfile.mkdtemp(prefix="aos-esp-check-", dir="/mnt"))
+            code, _, _ = run(["mount", "-o", "ro", partition, str(mount_dir)], timeout=15)
+            if code != 0:
+                return False
+            root = mount_dir
+        return (root / "EFI" / "Microsoft" / "Boot" / "bootmgfw.efi").is_file()
+    finally:
+        if mount_dir:
+            run(["umount", str(mount_dir)], timeout=10)
+            shutil.rmtree(mount_dir, ignore_errors=True)
+
+
+def windows_esp_for_disk(device):
+    for child in device.get("children") or []:
+        parttype = str(child.get("parttype") or "").lower()
+        fstype = str(child.get("fstype") or "").lower()
+        path = str(child.get("path") or "")
+        if parttype == EFI_SYSTEM_GUID and fstype in {"vfat", "fat", "fat32"} and path:
+            if partition_has_windows_loader(path):
+                return path
+    return ""
+
+
+def secure_boot_enabled():
+    for variable in Path("/sys/firmware/efi/efivars").glob("SecureBoot-*"):
+        try:
+            data = variable.read_bytes()
+            return len(data) >= 5 and data[4] == 1
+        except OSError:
+            continue
+    return False
+
+
+def alongside_targets(devices, source):
+    if not Path("/sys/firmware/efi").is_dir():
+        return []
+    targets = []
+    for device in devices:
+        if device.get("type") != "disk" or bool(device.get("rm")):
+            continue
+        path = os.path.realpath(str(device.get("path") or ""))
+        if not path or path == source or str(device.get("pttype") or "").lower() != "gpt":
+            continue
+        esp = windows_esp_for_disk(device)
+        if not esp:
+            continue
+        for region in disk_free_regions(path):
+            if region["size"] < MIN_ALONGSIDE_BYTES:
+                continue
+            blocked_reason = "Disable Secure Boot in UEFI settings before installing" if secure_boot_enabled() else ""
+            target_id = "alongside:{}:{}:{}".format(path, region["startMiB"], region["endMiB"])
+            targets.append({
+                "id": target_id,
+                "mode": "alongside",
+                "name": "Install alongside Windows",
+                "description": "Uses only unallocated space on {} | Windows detected{}".format(
+                    path, " | " + blocked_reason if blocked_reason else "",
+                ),
+                "size": region["size"],
+                "removable": False,
+                "installable": not blocked_reason,
+                "blockedReason": blocked_reason,
+                "disk": path,
+                "esp": esp,
+                "startMiB": region["startMiB"],
+                "endMiB": region["endMiB"],
+            })
+    return targets
+
+
 def storage_targets():
     live_source = live_source_device()
     source = os.path.realpath(live_source) if live_source else ""
-    targets = []
-    for device in block_devices():
+    devices = block_devices()
+    targets = alongside_targets(devices, source)
+    for device in devices:
         if device.get("type") != "disk":
             continue
         path = os.path.realpath(str(device.get("path") or ("/dev/" + str(device.get("name") or ""))))
@@ -249,7 +365,7 @@ def storage_targets():
         if blocked_reason:
             description += " | " + blocked_reason
         targets.append({
-            "id": path, "name": model or path, "description": description,
+            "id": path, "mode": "erase", "name": model or path, "description": description,
             "size": int(device.get("size") or 0), "removable": removable,
             "installable": not blocked_reason, "blockedReason": blocked_reason,
         })
@@ -299,7 +415,7 @@ def bluetooth_scan():
 
 
 def list_partitions(device):
-    code, output, _ = run(["lsblk", "--json", "--bytes", "--output", "PATH,TYPE,START,SIZE", device])
+    code, output, _ = run(["lsblk", "--json", "--bytes", "--output", "PATH,TYPE,START,SIZE,PARTN,FSTYPE", device])
     if code != 0:
         return []
     try:
@@ -330,7 +446,229 @@ def validate_install_target(target):
     return target, item
 
 
-def install_worker(target):
+def validate_alongside_target(target):
+    pattern = r"alongside:(/dev/(?:sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)):(\d+):(\d+)"
+    if not re.fullmatch(pattern, str(target or "")):
+        raise RuntimeError("A-OS rejected an unsafe alongside-install target")
+    listed = {item["id"]: item for item in storage_targets()["targets"] if item.get("mode") == "alongside"}
+    item = listed.get(target)
+    if not item:
+        raise RuntimeError("That Windows unallocated region is no longer available")
+    if not item.get("installable"):
+        raise RuntimeError(item.get("blockedReason") or "A-OS cannot use that Windows unallocated region")
+    if not Path("/sys/firmware/efi").is_dir():
+        raise RuntimeError("Install alongside Windows requires UEFI boot mode")
+    return item
+
+
+def partition_number(partition):
+    output = require_command(["lsblk", "-dnro", "PARTN", partition], timeout=5)
+    if not output.strip().isdigit():
+        raise RuntimeError("A-OS could not identify a new partition")
+    return int(output.strip())
+
+
+def create_partition(device, name, start_mib, end_mib):
+    before = {str(item.get("path") or "") for item in list_partitions(device)}
+    require_command([
+        "parted", "-s", device, "unit", "MiB", "mkpart", name, "ext4",
+        str(start_mib), str(end_mib),
+    ], timeout=30)
+    require_command(["partprobe", device], timeout=20)
+    run(["udevadm", "settle"], timeout=20)
+    time.sleep(1)
+    candidates = [item for item in list_partitions(device) if str(item.get("path") or "") not in before]
+    if not candidates:
+        raise RuntimeError("A-OS could not find the partition it created")
+    expected = start_mib * MIB
+    selected = min(candidates, key=lambda item: abs(int(item.get("start") or 0) - expected))
+    path = str(selected.get("path") or "")
+    return path, partition_number(path)
+
+
+def sha256_prefix(path, byte_count):
+    digest = hashlib.sha256()
+    remaining = int(byte_count)
+    with open(path, "rb", buffering=0) as handle:
+        while remaining:
+            block = handle.read(min(4 * MIB, remaining))
+            if not block:
+                raise RuntimeError("A-OS could not read the complete installation image")
+            digest.update(block)
+            remaining -= len(block)
+    return digest.hexdigest()
+
+
+def directory_size(path):
+    output = require_command(["du", "--bytes", "--summarize", str(path)], timeout=30)
+    value = output.split(None, 1)[0]
+    if not value.isdigit():
+        raise RuntimeError("A-OS could not measure the live installation files")
+    return int(value)
+
+
+def filesystem_uuid(partition):
+    value = require_command(["blkid", "-s", "UUID", "-o", "value", partition], timeout=8).strip()
+    if not re.fullmatch(r"[A-Za-z0-9-]+", value):
+        raise RuntimeError("A-OS could not read a filesystem identifier")
+    return value
+
+
+def aos_boot_entries():
+    code, output, _ = run(["efibootmgr"], timeout=8)
+    if code != 0:
+        return set()
+    return set(re.findall(r"^Boot([0-9A-Fa-f]{4})\*?\s+A-OS(?:\s|$)", output, re.MULTILINE))
+
+
+def grub_configuration(system_uuid, esp_uuid):
+    return """set timeout=8
+set default=0
+
+menuentry 'A-OS Desktop' {
+    search --no-floppy --fs-uuid --set=aosroot %s
+    linux ($aosroot)/live/vmlinuz boot=live components persistence live-media=/dev/disk/by-uuid/%s live-media-path=/live quiet splash loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8 noeject
+    initrd ($aosroot)/live/initrd.img
+}
+
+menuentry 'Windows Boot Manager' {
+    search --no-floppy --fs-uuid --set=winboot %s
+    chainloader ($winboot)/EFI/Microsoft/Boot/bootmgfw.efi
+}
+""" % (system_uuid, system_uuid, esp_uuid)
+
+
+def install_alongside_worker(target):
+    mount_root = None
+    mounted = []
+    original_partition_numbers = set()
+    new_boot_entry = ""
+    efi_directory = None
+    try:
+        item = validate_alongside_target(target)
+        device = item["disk"]
+        original_partition_numbers = {
+            int(partition.get("partn")) for partition in list_partitions(device)
+            if str(partition.get("partn") or "").isdigit()
+        }
+        live_medium = Path("/run/live/medium")
+        if not live_medium.is_dir() or not (live_medium / "live" / "filesystem.squashfs").is_file():
+            raise RuntimeError("The A-OS installation media could not be found")
+        system_mib = max(4096, int(math.ceil(directory_size(live_medium) / MIB)) + 1024)
+        available_mib = int(item["endMiB"]) - int(item["startMiB"])
+        if available_mib < system_mib + 8192:
+            raise RuntimeError("A-OS needs at least 8 GB of data space after its system image")
+
+        set_job_state(
+            INSTALL_STATE, INSTALL_LOCK, stage="partitioning", progress=6,
+            message="Creating A-OS partitions only inside Windows unallocated space",
+        )
+        system_end = int(item["startMiB"]) + system_mib
+        system_partition, system_number = create_partition(
+            device, "AOS_SYSTEM", int(item["startMiB"]), system_end,
+        )
+        persistence_partition, persistence_number = create_partition(
+            device, "AOS_DATA", system_end, int(item["endMiB"]),
+        )
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="formatting", progress=15, message="Formatting new A-OS partitions")
+        require_command(["mkfs.ext4", "-F", "-L", "AOS_SYSTEM", system_partition], timeout=180)
+        require_command(["mkfs.ext4", "-F", "-L", "persistence", persistence_partition], timeout=180)
+
+        mount_root = Path(tempfile.mkdtemp(prefix="aos-dual-install-", dir="/mnt"))
+        system_mount = mount_root / "system"
+        persistence_mount = mount_root / "data"
+        esp_mount = mount_root / "efi"
+        system_mount.mkdir()
+        persistence_mount.mkdir()
+        esp_mount.mkdir()
+
+        require_command(["mount", system_partition, str(system_mount)], timeout=20)
+        mounted.append(system_mount)
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="copying", progress=24, message="Copying A-OS system files into the new partition")
+        require_command([
+            "rsync", "-aH", "--delete", "--exclude=lost+found",
+            str(live_medium) + "/", str(system_mount) + "/",
+        ], timeout=3600)
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="verifying", progress=61, message="Verifying the installed A-OS system")
+        for relative in ("live/filesystem.squashfs", "live/vmlinuz", "live/initrd.img"):
+            source_file = live_medium / relative
+            installed_file = system_mount / relative
+            if not installed_file.is_file():
+                raise RuntimeError("The installed A-OS system is incomplete")
+            source_hash = sha256_prefix(source_file, source_file.stat().st_size)
+            installed_hash = sha256_prefix(installed_file, installed_file.stat().st_size)
+            if source_hash != installed_hash:
+                raise RuntimeError("The installed A-OS system did not match the USB files")
+
+        require_command(["mount", persistence_partition, str(persistence_mount)], timeout=20)
+        mounted.append(persistence_mount)
+        (persistence_mount / "persistence.conf").write_text("/ union\n", encoding="utf-8")
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="bootloader", progress=78, message="Adding A-OS beside Windows Boot Manager")
+        require_command(["mount", "-o", "rw", item["esp"], str(esp_mount)], timeout=20)
+        mounted.append(esp_mount)
+        windows_loader = esp_mount / "EFI" / "Microsoft" / "Boot" / "bootmgfw.efi"
+        if not windows_loader.is_file():
+            raise RuntimeError("Windows Boot Manager disappeared before installation")
+        efi_directory = esp_mount / "EFI" / "AOSDesktop"
+        if efi_directory.exists():
+            raise RuntimeError("An existing A-OS UEFI loader was found; remove the old A-OS installation first")
+        efi_directory.mkdir(parents=True)
+        grub_file = mount_root / "grub.cfg"
+        grub_file.write_text(
+            grub_configuration(filesystem_uuid(system_partition), filesystem_uuid(item["esp"])),
+            encoding="utf-8",
+        )
+        require_command([
+            "grub-mkstandalone", "--format=x86_64-efi",
+            "--output=" + str(efi_directory / "grubx64.efi"),
+            "--locales=", "--fonts=",
+            "--modules=part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain",
+            "boot/grub/grub.cfg=" + str(grub_file),
+        ], timeout=180)
+
+        previous_entries = aos_boot_entries()
+        code, output, error = run([
+            "efibootmgr", "--create", "--disk", device, "--part", str(partition_number(item["esp"])),
+            "--label", "A-OS", "--loader", "\\EFI\\AOSDesktop\\grubx64.efi",
+        ], timeout=30)
+        if code != 0:
+            raise RuntimeError(error or output or "A-OS could not create its UEFI boot entry")
+        added_entries = aos_boot_entries() - previous_entries
+        new_boot_entry = sorted(added_entries)[-1] if added_entries else ""
+        require_command(["sync"], timeout=60)
+        for path in reversed(mounted):
+            require_command(["umount", str(path)], timeout=30)
+        mounted.clear()
+        shutil.rmtree(mount_root, ignore_errors=True)
+        mount_root = None
+        set_job_state(
+            INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100,
+            message="A-OS is installed beside Windows. Remove the USB and restart to choose A-OS or Windows.",
+        )
+    except Exception as error:
+        if efi_directory and efi_directory.exists():
+            shutil.rmtree(efi_directory, ignore_errors=True)
+        for path in reversed(mounted):
+            run(["umount", str(path)], timeout=15)
+        if new_boot_entry:
+            run(["efibootmgr", "-b", new_boot_entry, "-B"], timeout=10)
+        if mount_root:
+            shutil.rmtree(mount_root, ignore_errors=True)
+        if "item" in locals():
+            current_numbers = {
+                int(partition.get("partn")) for partition in list_partitions(item["disk"])
+                if str(partition.get("partn") or "").isdigit()
+            }
+            for number in sorted(current_numbers - original_partition_numbers, reverse=True):
+                run(["parted", "-s", item["disk"], "rm", str(number)], timeout=30)
+            run(["partprobe", item["disk"]], timeout=20)
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="error", error=str(error), message="Installation stopped and new A-OS partitions were removed")
+
+
+def install_erase_worker(target):
     mount_dir = None
     try:
         target, item = validate_install_target(target)
@@ -607,12 +945,24 @@ class AosHandler(SimpleHTTPRequestHandler):
             self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error})
             return
         if route == "/__aos/install":
-            target, confirmation = str(body.get("target") or ""), str(body.get("confirmation") or "")
-            if confirmation != "ERASE " + target:
-                self._json(400, {"ok": False, "error": "Type ERASE followed by the exact drive path"})
-                return
+            target = str(body.get("target") or "")
+            mode = str(body.get("mode") or "erase")
+            confirmation = str(body.get("confirmation") or "")
             try:
-                validate_install_target(target)
+                if mode == "alongside":
+                    if confirmation != "INSTALL ALONGSIDE WINDOWS":
+                        raise RuntimeError("Type INSTALL ALONGSIDE WINDOWS to confirm")
+                    validate_alongside_target(target)
+                    worker = install_alongside_worker
+                    message = "Preparing unallocated space beside Windows"
+                elif mode == "erase":
+                    if confirmation != "ERASE " + target:
+                        raise RuntimeError("Type ERASE followed by the exact drive path")
+                    validate_install_target(target)
+                    worker = install_erase_worker
+                    message = "Preparing the selected drive"
+                else:
+                    raise RuntimeError("Unknown installation mode")
             except RuntimeError as error:
                 self._json(400, {"ok": False, "error": str(error)})
                 return
@@ -620,8 +970,8 @@ class AosHandler(SimpleHTTPRequestHandler):
                 if INSTALL_STATE["running"]:
                     self._json(409, {"ok": False, "error": "An installation is already running"})
                     return
-                INSTALL_STATE.update({"running": True, "stage": "starting", "progress": 2, "message": "Preparing the selected drive", "error": ""})
-            Thread(target=install_worker, args=(target,), daemon=True).start()
+                INSTALL_STATE.update({"running": True, "stage": "starting", "progress": 2, "message": message, "error": ""})
+            Thread(target=worker, args=(target,), daemon=True).start()
             self._json(202, {"ok": True, "started": True})
             return
         if route == "/__aos/update/apply":

@@ -104,7 +104,7 @@
   }
 
   function renderStorage() {
-    var main = mainShell("Where to install A\u2011OS", "Choose the safe live session or a real drive. Installing to a drive erases everything currently stored on that drive.");
+    var main = mainShell("Where to install A\u2011OS", "Choose the live session, install beside Windows in unallocated space, or dedicate an entire drive to A-OS.");
     var list = element("div", "aos-installer__targets");
     list.setAttribute("role", "radiogroup");
     targets.forEach(function (item) { list.appendChild(targetButton(item)); });
@@ -159,7 +159,7 @@
         bar.style.width = Math.max(0, Math.min(100, Number(state.progress || 0))) + "%";
         message.textContent = state.error || state.message || "Installing A-OS...";
         if (state.stage === "complete") {
-          var note = element("p", "aos-installer__warning", "Installation is complete. Remove the installation USB or DVD before restarting.");
+          var note = element("p", "aos-installer__warning", "Installation is complete. Remove the installation USB before restarting. The boot menu will let you choose A-OS or Windows when installed alongside Windows.");
           var restart = element("button", "primary", "Restart A-OS");
           restart.type = "button";
           restart.addEventListener("click", function () { window.AOS_NATIVE_BRIDGE.post("/__aos/power/restart", {}); });
@@ -185,11 +185,11 @@
   function startDiskInstall(main, target, confirmation, button) {
     button.disabled = true;
     button.textContent = "Starting";
-    window.AOS_NATIVE_BRIDGE.post("/__aos/install", {target: target.id, confirmation: confirmation.value}).then(function () {
+    window.AOS_NATIVE_BRIDGE.post("/__aos/install", {target: target.id, mode: target.mode || "erase", confirmation: confirmation.value}).then(function () {
       showInstallProgress(main);
     }).catch(function (error) {
       button.disabled = false;
-      button.textContent = "Erase drive and install A-OS";
+      button.textContent = target.mode === "alongside" ? "Install alongside Windows" : "Erase drive and install A-OS";
       var old = main.querySelector(".aos-installer__error");
       if (old) old.remove();
       main.insertBefore(element("p", "aos-installer__error", error && error.message ? error.message : "Installation could not start."), main.querySelector(".aos-installer__actions"));
@@ -199,7 +199,9 @@
   function renderInstall() {
     var target = selected();
     var isLive = target && target.id === "live";
-    var main = mainShell(isLive ? "Start A-OS without installing" : "Ready to install A\u2011OS", isLive ? "A-OS will run from the installation media. Changes are not guaranteed to survive a restart." : "A-OS will copy the bootable system and create persistent storage for accounts, settings, apps, and files.");
+    var isAlongside = target && target.mode === "alongside";
+    var lead = isLive ? "A-OS will run from the installation media. Changes are not guaranteed to survive a restart." : isAlongside ? "A-OS will use only the selected Windows unallocated space and create persistent storage for accounts, settings, apps, and files." : "A-OS will copy the bootable system and create persistent storage for accounts, settings, apps, and files.";
+    var main = mainShell(isLive ? "Start A-OS without installing" : isAlongside ? "Install beside Windows" : "Ready to install A\u2011OS", lead);
     var summary = element("div", "aos-installer__targets");
     summary.appendChild(targetButton(target));
     main.appendChild(summary);
@@ -207,17 +209,19 @@
       actions(main, {back: true, label: "Start live A-OS", onClick: finishLive});
       return main;
     }
-    main.appendChild(element("p", "aos-installer__warning", "Everything on " + target.id + " will be permanently erased. This cannot be undone."));
+    var phrase = isAlongside ? "INSTALL ALONGSIDE WINDOWS" : "ERASE " + target.id;
+    var buttonLabel = isAlongside ? "Install alongside Windows" : "Erase drive and install A-OS";
+    main.appendChild(element("p", "aos-installer__warning", isAlongside ? "A-OS will create two partitions inside this unallocated region and add its own UEFI boot entry. Existing Windows, recovery, and EFI partitions will not be formatted. Back up Windows, save your BitLocker recovery key, and disable Secure Boot first." : "Everything on " + target.id + " will be permanently erased. This cannot be undone."));
     var label = element("label", "aos-installer__confirm");
-    label.appendChild(element("span", "", "Type ERASE " + target.id + " to confirm"));
+    label.appendChild(element("span", "", "Type " + phrase + " to confirm"));
     var confirmation = document.createElement("input");
     confirmation.type = "text";
     confirmation.autocomplete = "off";
     confirmation.spellcheck = false;
     label.appendChild(confirmation);
     main.appendChild(label);
-    var install = actions(main, {back: true, label: "Erase drive and install A-OS", disabled: true, onClick: function () { startDiskInstall(main, target, confirmation, install); }});
-    confirmation.addEventListener("input", function () { install.disabled = confirmation.value !== "ERASE " + target.id; });
+    var install = actions(main, {back: true, label: buttonLabel, disabled: true, onClick: function () { startDiskInstall(main, target, confirmation, install); }});
+    confirmation.addEventListener("input", function () { install.disabled = confirmation.value !== phrase; });
     return main;
   }
 
@@ -234,7 +238,7 @@
 
   function show() {
     if (!shouldShow() || overlay || !document.body) return;
-    targets = [{id: "live", name: "A-OS live system", description: "Try A-OS without changing this computer", size: "Safe option", removable: false, installable: true}];
+    targets = [{id: "live", mode: "live", name: "A-OS live system", description: "Try A-OS without changing this computer", size: "Safe option", removable: false, installable: true}];
     overlay = element("section", "aos-installer");
     overlay.id = "aos-installation-wizard";
     overlay.setAttribute("role", "dialog");
@@ -248,6 +252,7 @@
         targets.push({
           id: String(item.id || item.name), name: item.name || "Storage device",
           description: item.description || "Detected storage", size: formatBytes(item.size),
+          mode: item.mode || "erase",
           removable: Boolean(item.removable), installable: item.installable !== false,
           blockedReason: item.blockedReason || ""
         });

@@ -12,6 +12,9 @@ curl
 ca-certificates
 parted
 gdisk
+grub-efi-amd64-bin
+efibootmgr
+dosfstools
 e2fsprogs
 util-linux
 rsync

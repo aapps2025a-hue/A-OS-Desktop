@@ -10,11 +10,20 @@ automatically.
 
 The native bridge provides a master Internet switch, real NetworkManager Wi-Fi
 scanning and connection, BlueZ Bluetooth pairing, hardware battery status, and
-device restart/shutdown. The installation wizard can copy the hybrid image to
-a different physical drive and create a Debian Live persistence partition for
-A-OS accounts, settings, application data, and files. It refuses the drive the
-live system booted from and requires the exact target path to be typed before
-the selected drive is erased.
+device restart/shutdown. The installation wizard supports both a dedicated
+drive and a conservative UEFI dual-boot installation beside Windows. The
+dual-boot path only uses space that Windows has already left unallocated; it
+does not resize NTFS, format the Windows EFI partition, or alter Windows and
+recovery partition boundaries. It creates separate A-OS system and persistence
+partitions, installs a self-contained A-OS UEFI loader, and keeps Windows Boot
+Manager available in the A-OS boot menu. The dedicated-drive path still erases
+the selected drive and requires the exact target path to be typed.
+
+Before a dual-boot installation, use Windows Disk Management to shrink the
+Windows volume and leave at least 32 GB unallocated. Save the BitLocker recovery
+key, disable Windows Fast Startup, and disable Secure Boot in UEFI settings. If the wizard cannot verify UEFI boot,
+GPT, Windows Boot Manager, and a sufficiently large unallocated extent, it does
+not offer the alongside option.
 
 The update indicator compares the packaged version with Firebase. An update is
 never installed automatically: after the user approves it, the native updater
@@ -45,6 +54,7 @@ sudo lb build
 
 The result is `live-image-amd64.hybrid.iso`. It is an ISO-hybrid image suitable
 for a virtual machine, DVD, or writing directly to a USB drive. The GitHub
-workflow builds it in a clean runner, boots it in QEMU until the real packaged
-HTML reports ready, publishes a checksum, and uploads the ISO to the
+workflow runs the installer unit tests, builds it in a clean runner, boots it
+in QEMU from both the ISO and a generated installed UEFI disk until the real
+packaged HTML reports ready, publishes a checksum, and uploads the ISO to the
 `iso-v1.2.1-classic1` release.

@@ -27,10 +27,13 @@ jobs:
       - name: Install Debian Live tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ca-certificates cpio debootstrap debian-archive-keyring dosfstools grub-efi-amd64-bin grub-pc-bin isolinux mtools qemu-system-x86 rsync squashfs-tools syslinux-common wget xorriso xz-utils
+          sudo apt-get install -y ca-certificates cpio debootstrap debian-archive-keyring dosfstools e2fsprogs grub-efi-amd64-bin grub-pc-bin isolinux mtools ovmf parted qemu-system-x86 rsync squashfs-tools syslinux-common wget xorriso xz-utils
           wget -qO /tmp/live-build.deb https://deb.debian.org/debian/pool/main/l/live-build/live-build_20250505+deb13u1_all.deb
           echo "58e09779881cbcc631c49ceb703413e0247a87db01823e597b2a1c40a2afd8f4  /tmp/live-build.deb" | sha256sum -c -
           sudo dpkg -i /tmp/live-build.deb
+
+      - name: Test installer safety logic
+        run: python3 -m unittest discover -s iso/tests -v
 
       - name: Add the current A-OS web build
         run: |
@@ -77,6 +80,94 @@ jobs:
           echo "Chromium did not load the packaged A-OS HTML within ten minutes." >&2
           exit 1
 
+      - name: Boot-test the dual-boot disk layout in UEFI
+        run: |
+          set -euo pipefail
+          disk=/tmp/aos-installed.raw
+          iso_mount=/mnt/aos-test-iso
+          system_mount=/mnt/aos-test-system
+          data_mount=/mnt/aos-test-data
+          efi_mount=/mnt/aos-test-efi
+          loop_device=""
+          qemu_pid=""
+          cleanup() {
+            if [ -n "$qemu_pid" ]; then kill "$qemu_pid" 2>/dev/null || true; fi
+            sudo umount "$efi_mount" "$data_mount" "$system_mount" "$iso_mount" 2>/dev/null || true
+            if [ -n "$loop_device" ]; then sudo losetup -d "$loop_device" 2>/dev/null || true; fi
+          }
+          trap cleanup EXIT
+          truncate -s 8G "$disk"
+          parted -s "$disk" mklabel gpt
+          parted -s "$disk" unit MiB mkpart EFI fat32 1 513
+          parted -s "$disk" set 1 esp on
+          parted -s "$disk" unit MiB mkpart AOS_SYSTEM ext4 513 4609
+          parted -s "$disk" unit MiB mkpart AOS_DATA ext4 4609 100%
+          loop_device=$(sudo losetup --find --show --partscan "$disk")
+          sudo mkfs.vfat -F 32 -n AOS_EFI "${loop_device}p1"
+          sudo mkfs.ext4 -F -L AOS_SYSTEM "${loop_device}p2"
+          sudo mkfs.ext4 -F -L persistence "${loop_device}p3"
+          sudo mkdir -p "$iso_mount" "$system_mount" "$data_mount" "$efi_mount"
+          sudo mount -o loop,ro A-OS-Desktop-amd64.iso "$iso_mount"
+          sudo mount "${loop_device}p2" "$system_mount"
+          sudo mount "${loop_device}p3" "$data_mount"
+          sudo mount "${loop_device}p1" "$efi_mount"
+          sudo rsync -aH --delete "$iso_mount/" "$system_mount/"
+          echo '/ union' | sudo tee "$data_mount/persistence.conf" >/dev/null
+          system_uuid=$(sudo blkid -s UUID -o value "${loop_device}p2")
+          esp_uuid=$(sudo blkid -s UUID -o value "${loop_device}p1")
+          python3 - "$system_uuid" "$esp_uuid" "$PWD" > /tmp/aos-installed-grub.cfg <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          import sys
+
+          repository = Path(sys.argv[3])
+          os.environ["AOS_PUBLIC_ROOT"] = str(repository / "public")
+          server_path = repository / "iso/config/includes.chroot/usr/local/lib/aos/server.py"
+          spec = importlib.util.spec_from_file_location("aos_server", server_path)
+          server = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(server)
+          print(server.grub_configuration(sys.argv[1], sys.argv[2]), end="")
+          PY
+          sudo mkdir -p "$efi_mount/EFI/BOOT"
+          sudo grub-mkstandalone \
+            --format=x86_64-efi \
+            --output="$efi_mount/EFI/BOOT/BOOTX64.EFI" \
+            --locales= \
+            --fonts= \
+            --modules="part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain" \
+            "boot/grub/grub.cfg=/tmp/aos-installed-grub.cfg"
+          sudo sync
+          sudo umount "$efi_mount" "$data_mount" "$system_mount" "$iso_mount"
+          sudo losetup -d "$loop_device"
+          loop_device=""
+          rm -f /tmp/aos-installed-serial.log
+          qemu-system-x86_64 \
+            -machine accel=tcg \
+            -m 3072 \
+            -smp 2 \
+            -bios /usr/share/OVMF/OVMF_CODE.fd \
+            -drive file="$disk",format=raw,if=virtio \
+            -boot c \
+            -display none \
+            -serial file:/tmp/aos-installed-serial.log \
+            -no-reboot &
+          qemu_pid=$!
+          for attempt in $(seq 1 300); do
+            if grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-installed-serial.log 2>/dev/null; then
+              echo "The installed UEFI layout loaded and executed the packaged A-OS HTML."
+              exit 0
+            fi
+            if ! kill -0 "$qemu_pid" 2>/dev/null; then
+              cat /tmp/aos-installed-serial.log
+              exit 1
+            fi
+            sleep 2
+          done
+          cat /tmp/aos-installed-serial.log
+          echo "The installed UEFI layout did not reach A-OS within ten minutes." >&2
+          exit 1
+
       - name: Create checksum
         run: sha256sum A-OS-Desktop-amd64.iso > A-OS-Desktop-amd64.iso.sha256
 
@@ -95,9 +186,11 @@ jobs:
         run: |
           if ! gh release view iso-v1.2.1-classic1 >/dev/null 2>&1; then
             gh release create iso-v1.2.1-classic1 \
-              --title "A-OS Desktop hardware-enabled bootable ISO" \
-              --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and the same A-OS Desktop HTML as the hosted website. The release is QEMU-tested until Chromium loads and executes the packaged page."
+              --title "A-OS Desktop hardware-enabled bootable ISO"
           fi
+          gh release edit iso-v1.2.1-classic1 \
+            --title "A-OS Desktop hardware-enabled bootable ISO" \
+            --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and a conservative UEFI install-alongside-Windows mode that uses only pre-existing unallocated space. Publication requires both the ISO and the installed UEFI disk layout to boot in QEMU until the packaged A-OS HTML executes."
           gh release upload iso-v1.2.1-classic1 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
