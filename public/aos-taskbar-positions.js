@@ -136,7 +136,9 @@
     if (!host) return;
     var previous = document.getElementById(POWER_SCREEN_ID);
     if (previous) previous.remove();
-    if (mode === "shutdown") localStorage.setItem(POWER_STATE_KEY, "off");
+    var nativePower = window.aosPowerBridge && typeof window.aosPowerBridge.perform === "function";
+    if (nativePower) localStorage.removeItem(POWER_STATE_KEY);
+    else if (mode === "shutdown") localStorage.setItem(POWER_STATE_KEY, "off");
     else if (mode === "hibernate") localStorage.setItem(POWER_STATE_KEY, "hibernating");
     else localStorage.removeItem(POWER_STATE_KEY);
     document.querySelectorAll("audio,video").forEach(function (media) {
@@ -147,8 +149,15 @@
     screen.className = "aos-lock-power-screen";
     var heading = mode === "restart" ? "Restarting A-OS" : mode === "hibernate" ? "A-OS is hibernating" : "A-OS is shut down";
     var message = mode === "restart" ? "Starting system services..." : mode === "hibernate" ? "Your open work is saved. Wake this device to continue where you left off." : "This browser session has powered off. Reload the page to start A-OS again.";
-    screen.innerHTML = '<img src="/assets/icons/OS Logo.png" alt=""><h1>' + heading + '</h1><p>' + message + '</p>' + (mode === "hibernate" ? '<button type="button">Wake A-OS</button>' : '');
+    screen.innerHTML = '<img src="/assets/icons/OS Logo.png" alt=""><h1>' + heading + '</h1><p>' + message + '</p>' + (mode === "hibernate" && !nativePower ? '<button type="button">Wake A-OS</button>' : '');
     host.appendChild(screen);
+    if (nativePower) {
+      window.aosPowerBridge.perform(mode).catch(function (error) {
+        var paragraph = screen.querySelector("p");
+        paragraph.textContent = error && error.message ? error.message : "A-OS could not complete the power request.";
+      });
+      return;
+    }
     if (mode === "shutdown") {
       document.title = "A-OS is shut down";
       window.setTimeout(function () { try { window.close(); } catch (_) {} }, 350);

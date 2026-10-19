@@ -14,7 +14,7 @@ NoNewPrivileges=false
 ProtectHome=true
 StateDirectory=aos
 StateDirectoryMode=0755
-ReadWritePaths=/tmp /opt/a-os/public
+ReadWritePaths=/tmp /var/lib/aos
 
 [Install]
 WantedBy=multi-user.target

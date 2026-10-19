@@ -6,6 +6,8 @@ dist/
 _site/
 .DS_Store
 Thumbs.db
+__pycache__/
+*.py[cod]
 *.lnk
 *.local
 .env

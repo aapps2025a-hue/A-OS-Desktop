@@ -148,6 +148,111 @@
     }
   }
 
+  function authMessage(code) {
+    return {
+      INVALID_LOGIN_CREDENTIALS: "The A-Applications email or password is incorrect.",
+      INVALID_EMAIL: "Enter a valid A-Applications email.",
+      MISSING_EMAIL: "Enter your A-Applications email.",
+      MISSING_PASSWORD: "Enter your A-Applications password.",
+      TOO_MANY_ATTEMPTS_TRY_LATER: "Too many attempts. Wait a moment and try again.",
+      USER_DISABLED: "This A-Applications account is disabled."
+    }[code] || "A-Applications could not sign in. Check the connection and try again.";
+  }
+
+  function sessionChanged(session) {
+    window.dispatchEvent(new CustomEvent("aos-aapplications-session-change", {detail: {session: session || null}}));
+    emit();
+  }
+
+  async function signIn(email, password) {
+    email = String(email || "").trim().toLowerCase();
+    if (!email) throw new Error("Enter your A-Applications email.");
+    if (!password) throw new Error("Enter your A-Applications password.");
+    var response = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + API_KEY, {
+      method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({email: email, password: password, returnSecureToken: true})
+    });
+    var result = await response.json();
+    if (!response.ok || !result.idToken) {
+      var code = String(result && result.error && result.error.message || "").split(" ")[0];
+      throw new Error(authMessage(code));
+    }
+    var session = {
+      idToken: result.idToken,
+      refreshToken: result.refreshToken,
+      uid: result.localId,
+      email: String(result.email || email).toLowerCase(),
+      expiresAt: Date.now() + Number(result.expiresIn || 3600) * 1000
+    };
+    safeSet(SESSION_KEY, JSON.stringify(session));
+    safeSet("aos-email", session.email);
+    sessionChanged(session);
+    return session;
+  }
+
+  function signOut() {
+    try { localStorage.removeItem(SESSION_KEY); } catch (_) {}
+    sessionChanged(null);
+  }
+
+  function accountLabel() {
+    var session = readSession();
+    return session ? (session.email || "A-Applications") : "Sign in";
+  }
+
+  function updateAccountControls(root) {
+    (root || document).querySelectorAll("[data-astore-account]").forEach(function (button) {
+      button.classList.toggle("signed-in", Boolean(readSession()));
+      var label = button.querySelector("span");
+      if (label) label.textContent = accountLabel();
+      else button.textContent = accountLabel();
+      button.title = readSession() ? "A-Applications account" : "Sign in with A-Applications";
+    });
+  }
+
+  function openAccountDialog() {
+    var existing = document.querySelector(".astore-account-modal");
+    if (existing) existing.remove();
+    var session = readSession();
+    var layer = document.createElement("div");
+    layer.className = "astore-modal astore-shell astore-account-modal";
+    layer.innerHTML = '<section class="astore-dialog astore-account-dialog" role="dialog" aria-modal="true"><header class="astore-dialog-head"><img src="' + asset("Profile.png") + '" alt=""><span><strong>A-Applications</strong><small>' + (session ? "A-Store account" : "Sign in to A-Store") + '</small></span><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><div class="astore-account-body">' + (session
+      ? '<p class="astore-account-email">' + escapeHtml(session.email || "Signed in") + '</p><p>Your A-Store publishing identity is active on this device.</p><button class="danger" data-account-signout>Sign out</button>'
+      : '<form data-account-form><label class="astore-field">A-Applications email<input type="email" autocomplete="username" data-account-email required></label><label class="astore-field">Password<input type="password" autocomplete="current-password" data-account-password required></label><div class="astore-publish-status" data-account-status>Use the same account you use in A-Applications.</div><button class="primary" type="submit" data-account-submit>Sign in</button></form>') + '</div></section>';
+    layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); });
+    layer.addEventListener("click", function (event) { if (event.target === layer) layer.remove(); });
+    if (session) {
+      layer.querySelector("[data-account-signout]").addEventListener("click", function () {
+        signOut();
+        layer.remove();
+        notify("Signed out of A-Applications");
+      });
+    } else {
+      var form = layer.querySelector("[data-account-form]");
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        var button = layer.querySelector("[data-account-submit]");
+        var status = layer.querySelector("[data-account-status]");
+        button.disabled = true;
+        status.className = "astore-publish-status";
+        status.textContent = "Signing in...";
+        try {
+          var account = await signIn(layer.querySelector("[data-account-email]").value, layer.querySelector("[data-account-password]").value);
+          layer.remove();
+          notify("Signed in to A-Store as " + account.email);
+        } catch (error) {
+          status.className = "astore-publish-status error";
+          status.textContent = error.message;
+          button.disabled = false;
+        }
+      });
+    }
+    document.body.appendChild(layer);
+    var firstInput = layer.querySelector("input");
+    if (firstInput) firstInput.focus();
+  }
+
   function fsValue(value) {
     if (value === null || value === undefined) return {nullValue: null};
     if (typeof value === "boolean") return {booleanValue: value};
@@ -541,6 +646,7 @@
     if (!app.files["index.html"]) return notify("This app does not include index.html.");
     var layer = document.createElement("div");
     layer.className = "astore-window-layer astore-shell";
+    layer.dataset.aStoreSlug = app.slug;
     layer.innerHTML = '<section class="astore-app-window"><header class="astore-window-head"><img src="' + escapeHtml(app.logo) + '" alt=""><span><strong>' + escapeHtml(app.name) + '</strong><small>A-Store app - version ' + escapeHtml(app.version) + '</small></span><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><iframe title="' + escapeHtml(app.name) + '" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads" referrerpolicy="no-referrer"></iframe></section>';
     layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); ensureShelfButton(); });
     layer.querySelector("iframe").srcdoc = compileAppDocument(app);
@@ -598,7 +704,7 @@
 
   function renderStandalone(root) {
     root.className = "astore-shell";
-    root.innerHTML = '<header class="astore-topbar"><div class="astore-brand"><span>A</span><div><strong>A-Store</strong><small>Apps for A-OS and Android</small></div></div><label class="astore-search"><img src="' + asset("Search.svg") + '" alt=""><input type="search" placeholder="Search apps, categories, and publishers"></label><div class="astore-actions"><button data-refresh aria-label="Refresh catalog">Refresh</button><button class="astore-install-pwa" data-install-pwa hidden>Install on Windows</button><a class="astore-button" href="' + ANDROID_APK_URL + '">A-Store for Android</a><button class="primary astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></header><main class="astore-main"><section class="astore-section"><div class="astore-featured" data-featured></div></section><section class="astore-section"><div class="astore-section-head"><div><h2>All apps</h2><p>Every Android app gets its own APK and stable identity. New packages are built within a few minutes of publishing.</p></div><span class="astore-trust-label" data-count></span></div><div class="astore-grid" data-grid></div><div class="astore-error" data-error hidden></div></section></main>';
+    root.innerHTML = '<header class="astore-topbar"><div class="astore-brand"><span>A</span><div><strong>A-Store</strong><small>Apps for A-OS and Android</small></div></div><label class="astore-search"><img src="' + asset("Search.svg") + '" alt=""><input type="search" placeholder="Search apps, categories, and publishers"></label><div class="astore-actions"><button class="astore-account-button" data-astore-account><img src="' + asset("Profile.png") + '" alt=""><span></span></button><button data-refresh aria-label="Refresh catalog">Refresh</button><button class="astore-install-pwa" data-install-pwa hidden>Install on Windows</button><a class="astore-button" href="' + ANDROID_APK_URL + '">A-Store for Android</a><button class="primary astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></header><main class="astore-main"><section class="astore-section"><div class="astore-featured" data-featured></div></section><section class="astore-section"><div class="astore-section-head"><div><h2>All apps</h2><p>Every Android app gets its own APK and stable identity. New packages are built within a few minutes of publishing.</p></div><span class="astore-trust-label" data-count></span></div><div class="astore-grid" data-grid></div><div class="astore-error" data-error hidden></div></section></main>';
     var search = root.querySelector("input[type=search]");
     var grid = root.querySelector("[data-grid]");
     var featured = root.querySelector("[data-featured]");
@@ -613,9 +719,11 @@
       error.hidden = !state.error;
       error.textContent = state.error;
       installButton.hidden = !state.installPrompt;
+      updateAccountControls(root);
     }
     search.addEventListener("input", refreshView);
     root.querySelector("[data-dev]").addEventListener("click", function () { openDeveloper(); });
+    root.querySelector("[data-astore-account]").addEventListener("click", openAccountDialog);
     root.querySelector("[data-refresh]").addEventListener("click", function () { loadCatalog(true); loadApkIndex(true); });
     installButton.addEventListener("click", async function () {
       if (!state.installPrompt) return;
@@ -634,13 +742,15 @@
     if (!section) {
       section = document.createElement("section");
       section.className = "astore-store-extension astore-shell";
-      section.innerHTML = '<div class="astore-section-head"><div><h2>Developer and community apps</h2><p>New apps publish immediately. Only show-off selections and highly downloaded apps are promoted.</p></div><div class="astore-inline-actions"><a class="astore-button" href="' + ANDROID_APK_URL + '">Android APK</a><button class="astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></div><div class="astore-featured" data-featured hidden></div><div class="astore-grid" data-grid></div>';
+      section.innerHTML = '<div class="astore-section-head"><div><h2>Developer and community apps</h2><p>New apps publish immediately. Only show-off selections and highly downloaded apps are promoted.</p></div><div class="astore-inline-actions"><button class="astore-account-button" data-astore-account><img src="' + asset("Profile.png") + '" alt=""><span></span></button><a class="astore-button" href="' + ANDROID_APK_URL + '">Android APK</a><button class="astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></div><div class="astore-featured" data-featured hidden></div><div class="astore-grid" data-grid></div>';
       store.appendChild(section);
       section.querySelector("[data-dev]").addEventListener("click", function () {
         if (installationState(BUILT_INS[0]) !== "open") installApp(BUILT_INS[0]);
         openDeveloper();
       });
+      section.querySelector("[data-astore-account]").addEventListener("click", openAccountDialog);
     }
+    updateAccountControls(section);
     var community = state.apps.filter(function (app) { return app.slug === "a-store-dev" || !app.builtin; });
     renderCards(section.querySelector("[data-grid]"), community);
     renderFeatured(section.querySelector("[data-featured]"), community);
@@ -883,7 +993,10 @@
     else layer.querySelector('[data-media="video"]').addEventListener("change", mediaChange);
     layer.querySelectorAll('[data-media="logo"],[data-media="preview"]').forEach(function (input) { input.addEventListener("change", mediaChange); });
     var session = readSession();
-    layer.querySelector("[data-login-note]").textContent = session ? "Publishing as " + (session.email || "your A-Applications account") + ". Updates keep the same Store ID." : "Sign in with A-Applications in A-OS before publishing. Editing and preview still work without sign-in.";
+    var loginNote = layer.querySelector("[data-login-note]");
+    loginNote.innerHTML = session ? "Publishing as <strong>" + escapeHtml(session.email || "your A-Applications account") + "</strong>. Updates keep the same Store ID." : 'Sign in with A-Applications before publishing. <button type="button" data-dev-signin>Sign in</button>';
+    var developerSignIn = layer.querySelector("[data-dev-signin]");
+    if (developerSignIn) developerSignIn.addEventListener("click", openAccountDialog);
     editor.addEventListener("input", syncEditor);
     layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); ensureShelfButton(); });
     layer.querySelector("[data-publish-panel]").addEventListener("click", function () { publishPanel.scrollTop = 0; });
@@ -964,6 +1077,14 @@
     loadApkIndex();
     setInterval(function () { loadCatalog(true); }, 30000);
     setInterval(function () { loadApkIndex(false); }, 120000);
+    window.addEventListener("storage", function (event) { if (event.key === SESSION_KEY) sessionChanged(readSession()); });
+    window.addEventListener("aos-aapplications-session-change", function () { updateAccountControls(document); });
+    window.addEventListener("aos-restore-app", function (event) {
+      var detail = event.detail || {};
+      if (!detail.slug) return;
+      var app = state.apps.concat(BUILT_INS).find(function (candidate) { return candidate.slug === detail.slug; });
+      if (app) openApp(app);
+    });
   }
 
   window.AOS_STORE_PLATFORM = {
@@ -976,6 +1097,9 @@
     loadApkIndex: loadApkIndex,
     scanPackage: scanPackage,
     compileAppDocument: compileAppDocument,
+    signIn: signIn,
+    signOut: signOut,
+    openAccount: openAccountDialog,
     getState: function () { return state; }
   };
 

@@ -19,8 +19,12 @@ the selected drive is erased.
 The update indicator compares the packaged version with Firebase. An update is
 never installed automatically: after the user approves it, the native updater
 downloads the exact published Git commit, validates the archive paths, and
-updates only `/opt/a-os/public` in the background. A persistent installation is
-required for that update to survive a restart.
+installs it as a versioned release under `/var/lib/aos/releases`. A validated
+release is activated with one atomic link switch, so a failed download cannot
+replace the working system. A persistent installation is required for updates.
+The Chromium profile is also kept under `/var/lib/aos`, preserving Files,
+settings, installed apps, browser data, accounts, and hibernation state on the
+installed disk.
 
 Virtual machines only show physical Wi-Fi or Bluetooth devices when the host
 passes the corresponding hardware through to the guest. The live boot enables

@@ -181,6 +181,18 @@
     }
   };
 
+  window.aosPowerBridge = {
+    perform: function (action) {
+      var normalized = action === "restart" ? "restart" : action === "hibernate" ? "hibernate" : "shutdown";
+      var save = window.AOS_SESSION_PERSISTENCE && typeof window.AOS_SESSION_PERSISTENCE.save === "function"
+        ? window.AOS_SESSION_PERSISTENCE.save(normalized)
+        : Promise.resolve();
+      return Promise.resolve(save).then(function () {
+        return post("/__aos/power/" + normalized, {});
+      });
+    }
+  };
+
   refreshSystem();
   window.setInterval(refreshSystem, 10000);
   window.setTimeout(function () {

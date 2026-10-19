@@ -15,7 +15,10 @@ import tempfile
 import time
 
 
-ROOT = Path(os.environ.get("AOS_PUBLIC_ROOT", "/opt/a-os/public")).resolve()
+PACKAGED_ROOT = Path(os.environ.get("AOS_PUBLIC_ROOT", "/opt/a-os/public")).resolve()
+STATE_ROOT = Path(os.environ.get("AOS_STATE_ROOT", "/var/lib/aos")).resolve()
+RELEASES_ROOT = STATE_ROOT / "releases"
+ACTIVE_RELEASE = STATE_ROOT / "active-public"
 READY_FILE = Path(os.environ.get("AOS_READY_FILE", "/tmp/aos-browser-ready"))
 PORT = int(os.environ.get("AOS_PORT", "5000"))
 REMOTE_VERSION_URL = "https://a-os-desktop.web.app/version.json"
@@ -29,7 +32,18 @@ UPDATE_LOCK = Lock()
 INSTALL_LOCK = Lock()
 UPDATE_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
 INSTALL_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
-os.chdir(ROOT)
+os.chdir(PACKAGED_ROOT)
+
+
+def active_public_root():
+    try:
+        active = ACTIVE_RELEASE.resolve(strict=True)
+        releases = RELEASES_ROOT.resolve(strict=False)
+        if releases in active.parents and (active / "index.html").is_file():
+            return active
+    except (OSError, RuntimeError):
+        pass
+    return PACKAGED_ROOT
 
 
 def run(command, timeout=COMMAND_TIMEOUT):
@@ -84,8 +98,17 @@ def remote_version(force=False):
 
 
 def persistent_storage_active():
-    code, output, _ = run(["findmnt", "-rn", "-o", "TARGET"], timeout=2)
-    return code == 0 and any(line.startswith("/run/live/persistence") for line in output.splitlines())
+    code, output, _ = run(["findmnt", "-rn", "-o", "TARGET,SOURCE,FSTYPE"], timeout=2)
+    if code == 0:
+        for line in output.splitlines():
+            lowered = line.lower()
+            if "/run/live/persistence" in lowered or "persistence" in lowered and "overlay" not in lowered:
+                return True
+    try:
+        command_line = Path("/proc/cmdline").read_text(encoding="utf-8", errors="ignore")
+        return "persistence" in command_line.split()
+    except OSError:
+        return False
 
 
 def battery_state():
@@ -400,13 +423,15 @@ def safe_extract_public(archive_path, destination):
 
 def update_worker(version):
     work = None
+    partial_release = None
     try:
         revision = str((version or {}).get("revision") or "").lower()
         if not re.fullmatch(r"[0-9a-f]{40}", revision):
             raise RuntimeError("The published update is not linked to a verified source revision")
         set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="downloading", progress=8, message="Downloading the verified A-OS source revision")
-        Path("/var/lib/aos").mkdir(parents=True, exist_ok=True)
-        work = Path(tempfile.mkdtemp(prefix="update-", dir="/var/lib/aos"))
+        STATE_ROOT.mkdir(parents=True, exist_ok=True)
+        RELEASES_ROOT.mkdir(parents=True, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix="update-", dir=str(STATE_ROOT)))
         archive_path = work / "update.tar.gz"
         request = Request(SOURCE_ARCHIVE_URL.format(revision=revision), headers={"User-Agent": "A-OS-Updater/1.2.1"})
         with urlopen(request, timeout=30) as response, archive_path.open("wb") as handle:
@@ -422,25 +447,50 @@ def update_worker(version):
                 if total:
                     set_job_state(UPDATE_STATE, UPDATE_LOCK, progress=min(54, 8 + int(received / total * 46)))
         set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="verifying", progress=58, message="Verifying and preparing A-OS files")
-        stage = work / "public"
-        stage.mkdir()
-        safe_extract_public(archive_path, stage)
-        if not (stage / "index.html").is_file():
+        partial_release = RELEASES_ROOT / (revision + ".partial")
+        shutil.rmtree(partial_release, ignore_errors=True)
+        partial_release.mkdir()
+        safe_extract_public(archive_path, partial_release)
+        if not (partial_release / "index.html").is_file():
             raise RuntimeError("The update is missing the A-OS start page")
         set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="installing", progress=76, message="Installing the update in the background")
-        require_command(["rsync", "-a", "--delete", str(stage) + "/", str(ROOT) + "/"], timeout=300)
-        (ROOT / "version.json").write_text(json.dumps(version, indent=2) + "\n", encoding="utf-8")
+        (partial_release / "version.json").write_text(json.dumps(version, indent=2) + "\n", encoding="utf-8")
+        release = RELEASES_ROOT / revision
+        if release.exists():
+            shutil.rmtree(partial_release)
+            (release / "version.json").write_text(json.dumps(version, indent=2) + "\n", encoding="utf-8")
+        else:
+            partial_release.rename(release)
+        partial_release = None
+        next_link = STATE_ROOT / (".active-public-" + revision)
+        try:
+            next_link.unlink()
+        except FileNotFoundError:
+            pass
+        next_link.symlink_to(release, target_is_directory=True)
+        os.replace(next_link, ACTIVE_RELEASE)
         require_command(["sync"], timeout=60)
         set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="complete", progress=100, message="A-OS is updated. Restart to use the new version.")
     except Exception as error:
         set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="error", error=str(error), message="The update was not installed")
     finally:
+        if partial_release:
+            shutil.rmtree(partial_release, ignore_errors=True)
         if work:
             shutil.rmtree(work, ignore_errors=True)
 
 
+def finish_power_action(action):
+    subprocess.run(["systemctl", "stop", "aos-session.service"], check=False)
+    subprocess.run(["sync"], check=False)
+    subprocess.run(["systemctl", "reboot" if action == "restart" else "poweroff"], check=False)
+
+
 class AosHandler(SimpleHTTPRequestHandler):
     server_version = "A-OS Native Bridge/1.1"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(active_public_root()), **kwargs)
 
     def _same_machine_request(self):
         host = (self.headers.get("Host") or "").split(":", 1)[0].strip("[]").lower()
@@ -480,7 +530,7 @@ class AosHandler(SimpleHTTPRequestHandler):
                 self._json(200, routes[route]())
                 return
             if route == "/__aos/update":
-                self._json(200, {"packagedVersion": read_json_file(ROOT / "version.json"), "remoteVersion": remote_version(), "persistent": persistent_storage_active()})
+                self._json(200, {"packagedVersion": read_json_file(active_public_root() / "version.json"), "remoteVersion": remote_version(), "persistent": persistent_storage_active()})
                 return
             if route == "/__aos/update/status":
                 self._json(200, {"ok": True, **job_snapshot(UPDATE_STATE, UPDATE_LOCK)})
@@ -575,6 +625,9 @@ class AosHandler(SimpleHTTPRequestHandler):
             self._json(202, {"ok": True, "started": True})
             return
         if route == "/__aos/update/apply":
+            if not persistent_storage_active():
+                self._json(409, {"ok": False, "error": "Install A-OS to a disk with persistent storage before applying updates"})
+                return
             version = remote_version(force=True)
             if not version:
                 self._json(503, {"ok": False, "error": "A-OS could not reach the update service"})
@@ -588,9 +641,9 @@ class AosHandler(SimpleHTTPRequestHandler):
             self._json(202, {"ok": True, "started": True})
             return
         if route in {"/__aos/power/restart", "/__aos/power/shutdown", "/__aos/power/hibernate"}:
-            action = "reboot" if route.endswith("restart") else "hibernate" if route.endswith("hibernate") else "poweroff"
+            action = "restart" if route.endswith("restart") else "hibernate" if route.endswith("hibernate") else "shutdown"
             self._json(200, {"ok": True, "action": action})
-            Timer(1.0, lambda: subprocess.run(["systemctl", action], check=False)).start()
+            Timer(0.8, finish_power_action, args=(action,)).start()
             return
         self._json(404, {"ok": False, "error": "Unknown A-OS endpoint"})
 

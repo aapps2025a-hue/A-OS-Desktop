@@ -161,6 +161,30 @@
   flex-wrap: wrap;
 }
 
+.astore-account-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 220px;
+}
+
+.astore-account-button img {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  object-fit: contain;
+}
+
+.astore-account-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.astore-account-button.signed-in {
+  border-color: color-mix(in srgb, var(--astore-good) 55%, var(--astore-line));
+}
+
 .astore-button,
 .astore-shell button,
 .astore-shell select,
@@ -521,6 +545,38 @@
 .astore-close img {
   width: 20px;
   height: 20px;
+}
+
+.astore-account-dialog {
+  width: min(460px, 94vw);
+}
+
+.astore-account-body {
+  padding: 22px;
+}
+
+.astore-account-body form {
+  display: grid;
+  gap: 14px;
+}
+
+.astore-account-body p {
+  margin: 0 0 16px;
+  color: var(--astore-muted);
+  line-height: 1.5;
+}
+
+.astore-account-body .astore-account-email {
+  margin-bottom: 5px;
+  color: var(--astore-text);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.astore-login-note button {
+  min-height: 28px;
+  margin-left: 5px;
+  padding: 4px 9px;
 }
 
 .astore-detail-body {

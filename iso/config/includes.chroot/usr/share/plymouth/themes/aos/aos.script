@@ -2,10 +2,9 @@ Window.SetBackgroundTopColor(0.02, 0.024, 0.027);
 Window.SetBackgroundBottomColor(0.02, 0.024, 0.027);
 
 logo_image = Image("aos-boot.png");
-logo_image = logo_image.Scale(Window.GetWidth(), Window.GetHeight());
 logo_sprite = Sprite(logo_image);
-logo_sprite.SetX(0);
-logo_sprite.SetY(0);
+logo_sprite.SetX(Window.GetWidth() / 2 - logo_image.GetWidth() / 2);
+logo_sprite.SetY(Window.GetHeight() / 2 - logo_image.GetHeight() / 2);
 logo_sprite.SetZ(10000);
 
 fun refresh_callback () {

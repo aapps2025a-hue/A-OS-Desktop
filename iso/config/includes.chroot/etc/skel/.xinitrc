@@ -57,7 +57,9 @@ while true; do
     --no-service-autorun \
     --autoplay-policy=no-user-gesture-required \
     --password-store=basic \
-    --user-data-dir=/home/aos/.config/aos-runtime \
+    --restore-last-session \
+    --user-data-dir=/var/lib/aos/browser-profile \
+    --disk-cache-dir=/var/lib/aos/browser-cache \
     >/dev/null 2>&1
   sleep 1
 done
