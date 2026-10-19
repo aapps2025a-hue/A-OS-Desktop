@@ -102,8 +102,14 @@ async function main() {
   };
   const appButton = (label) => `[...document.querySelectorAll("button")].find((button) => button.getAttribute("aria-label") === ${JSON.stringify(label)})`;
 
+  await cdp.send("Page.enable");
   await cdp.send("Runtime.enable");
+  await cdp.send("Page.navigate", { url });
   await waitFor("document.readyState === 'complete'", "the initial page");
+  await waitFor(
+    `(() => { try { localStorage.getItem("aos-configured"); return location.origin === ${JSON.stringify(new URL(url).origin)}; } catch (_) { return false; } })()`,
+    "A-OS origin storage"
+  );
   await evaluate(`
     localStorage.setItem("aos-configured", "true");
     localStorage.setItem("aos-no-locking", "true");
@@ -141,6 +147,21 @@ async function main() {
     await waitFor(`${appButton(label)} != null`, `${label} on the taskbar`);
     await evaluate(`${appButton(label)}.click()`);
     await waitFor(`${appButton(label)}.classList.contains("state-open")`, `${label} to open`);
+  }
+
+  await evaluate(`${appButton("Settings")}.click()`);
+  await waitFor(`[...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Appearance")`, "Appearance settings");
+  await evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Appearance").click()`);
+  await waitFor(
+    `["Porto", "Faro"].every((name) => [...document.querySelectorAll(".wall-grid button span")].some((item) => item.textContent.trim() === name))`,
+    "the restored Porto and Faro wallpapers"
+  );
+  const wallpaperPaths = await evaluate(`[
+    window.getSystemWallpaper("Porto.png"),
+    window.getSystemWallpaper("Faro.jpg")
+  ]`);
+  if (!wallpaperPaths[0].endsWith("/assets/backgrounds/Porto.png") || !wallpaperPaths[1].endsWith("/assets/backgrounds/Faro.jpg")) {
+    throw new Error(`Restored wallpaper resolver returned unexpected paths: ${wallpaperPaths.join(", ")}`);
   }
 
   const visibleArea = await evaluate("document.body.getBoundingClientRect().width > 900 && document.body.getBoundingClientRect().height > 500");

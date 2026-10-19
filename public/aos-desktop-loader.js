@@ -56,5 +56,5 @@ window.AOS_HARDWARE_STATE = {minimumRamGb: MINIMUM_RAM_GB, memoryGb, blocked};
 if (blocked) {
   renderBootFailure(memoryGb, false);
 } else {
-  import("./assets/index-D5wdOlTt-managed8.js").catch(() => renderBootFailure(memoryGb, true));
+  import("./assets/index-D5wdOlTt-managed9.js").catch(() => renderBootFailure(memoryGb, true));
 }

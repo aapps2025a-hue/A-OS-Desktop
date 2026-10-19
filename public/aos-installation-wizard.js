@@ -3,12 +3,12 @@
 
   if (!window.AOS_NATIVE_BRIDGE || window.AOS_INSTALLATION_WIZARD) return;
 
-  var COMPLETE_KEY = "aos-native-installation-complete-v3";
+  var COMPLETE_KEY = "aos-native-installation-complete-v4";
   var TARGET_KEY = "aos-native-installation-target";
   var baseUrl = new URL("./", document.currentScript ? document.currentScript.src : window.location.href);
   var overlay = null;
   var step = 0;
-  var selectedTarget = "live";
+  var selectedTarget = "";
   var targets = [];
   var pollTimer = 0;
 
@@ -42,7 +42,7 @@
   }
 
   function selected() {
-    return targets.find(function (item) { return item.id === selectedTarget; }) || targets[0];
+    return targets.find(function (item) { return item.id === selectedTarget; }) || null;
   }
 
   function renderSteps(sidebar) {
@@ -158,7 +158,7 @@
         bar.style.width = Math.max(0, Math.min(100, Number(state.progress || 0))) + "%";
         message.textContent = state.error || state.message || "Installing A-OS...";
         if (state.stage === "complete") {
-          var note = element("p", "aos-installer__warning", "Installation is complete. Remove the installation USB before restarting. The boot menu will let you choose A-OS or Windows when installed alongside Windows.");
+          var note = element("p", "aos-installer__warning", "Installation is complete. Remove the installation USB, then restart. The installed A-OS is now the next boot target; Windows remains available from the A-OS boot menu when installed alongside Windows.");
           var restart = element("button", "primary", "Restart A-OS");
           restart.type = "button";
           restart.addEventListener("click", function () { window.AOS_NATIVE_BRIDGE.post("/__aos/power/restart", {}); });
@@ -237,6 +237,8 @@
 
   function show(force) {
     if ((!force && !shouldShow()) || overlay || !document.body) return;
+    step = 0;
+    selectedTarget = "";
     targets = [{id: "live", mode: "live", name: "A-OS live system", description: "Try A-OS without changing this computer", size: "Safe option", removable: false, installable: true}];
     overlay = element("section", "aos-installer");
     overlay.id = "aos-installation-wizard";

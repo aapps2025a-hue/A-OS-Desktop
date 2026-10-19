@@ -2,7 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -52,6 +52,44 @@ class InstallerSafetyTests(unittest.TestCase):
         self.assertIn("/EFI/AOSDesktop/splash.png", config)
         self.assertIn("menuentry 'Windows Boot Manager'", config)
         self.assertIn("/EFI/Microsoft/Boot/bootmgfw.efi", config)
+
+    def test_efi_boot_order_parser(self):
+        output = """BootCurrent: 0004
+BootNext: 0007
+BootOrder: 0001,0007,0004
+Boot0001* Windows Boot Manager
+Boot0007* A-OS
+"""
+        with patch.object(SERVER, "run", return_value=(0, output, "")):
+            self.assertEqual(SERVER.efi_boot_order(), ["0001", "0007", "0004"])
+
+    def test_prioritize_aos_boot_sets_permanent_and_next_boot(self):
+        output = """BootCurrent: 0004
+BootOrder: 0001,0007,0004
+Boot0001* Windows Boot Manager
+Boot0007* A-OS
+"""
+        with patch.object(SERVER, "run", return_value=(0, output, "")):
+            with patch.object(SERVER, "require_command", return_value="") as command:
+                SERVER.prioritize_aos_boot("0007")
+        self.assertEqual(
+            command.call_args_list,
+            [
+                call(["efibootmgr", "--bootorder", "0007,0001,0004"], timeout=10),
+                call(["efibootmgr", "--bootnext", "0007"], timeout=10),
+            ],
+        )
+
+    def test_prioritize_aos_boot_rejects_invalid_entry(self):
+        with self.assertRaisesRegex(RuntimeError, "identify"):
+            SERVER.prioritize_aos_boot("0007;reboot")
+
+    def test_prioritize_aos_boot_keeps_existing_order_on_read_failure(self):
+        with patch.object(SERVER, "run", return_value=(1, "", "firmware unavailable")):
+            with patch.object(SERVER, "require_command") as command:
+                with self.assertRaisesRegex(RuntimeError, "boot order"):
+                    SERVER.prioritize_aos_boot("0007")
+        command.assert_not_called()
 
 
 if __name__ == "__main__":

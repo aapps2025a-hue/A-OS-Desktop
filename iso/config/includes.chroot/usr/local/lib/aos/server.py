@@ -521,6 +521,31 @@ def aos_boot_entries():
     return set(re.findall(r"^Boot([0-9A-Fa-f]{4})\*?\s+A-OS(?:\s|$)", output, re.MULTILINE))
 
 
+def efi_boot_order():
+    code, output, _ = run(["efibootmgr"], timeout=8)
+    if code != 0:
+        return []
+    match = re.search(r"^BootOrder:\s*([^\r\n]+)", output, re.MULTILINE)
+    if not match:
+        return []
+    return [
+        value.strip().upper() for value in match.group(1).split(",")
+        if re.fullmatch(r"[0-9A-Fa-f]{4}", value.strip())
+    ]
+
+
+def prioritize_aos_boot(entry):
+    entry = str(entry or "").upper()
+    if not re.fullmatch(r"[0-9A-F]{4}", entry):
+        raise RuntimeError("A-OS could not identify its new UEFI boot entry")
+    current_order = efi_boot_order()
+    if not current_order:
+        raise RuntimeError("A-OS could not read the current UEFI boot order")
+    order = [value for value in current_order if value != entry]
+    require_command(["efibootmgr", "--bootorder", ",".join([entry] + order)], timeout=10)
+    require_command(["efibootmgr", "--bootnext", entry], timeout=10)
+
+
 def grub_configuration(system_uuid, esp_uuid):
     return """set timeout=8
 set default=0
@@ -652,6 +677,7 @@ def install_alongside_worker(target):
             raise RuntimeError(error or output or "A-OS could not create its UEFI boot entry")
         added_entries = aos_boot_entries() - previous_entries
         new_boot_entry = sorted(added_entries)[-1] if added_entries else ""
+        prioritize_aos_boot(new_boot_entry)
         require_command(["sync"], timeout=60)
         for path in reversed(mounted):
             require_command(["umount", str(path)], timeout=30)
@@ -660,7 +686,7 @@ def install_alongside_worker(target):
         mount_root = None
         set_job_state(
             INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100,
-            message="A-OS is installed beside Windows. Remove the USB and restart to choose A-OS or Windows.",
+            message="A-OS is installed beside Windows and set as the next boot. Remove the USB and restart; Windows remains in the A-OS boot menu.",
         )
     except Exception as error:
         if efi_directory and efi_directory.exists():
