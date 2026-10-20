@@ -27,7 +27,12 @@ Before a dual-boot installation, use Windows Disk Management to shrink the
 Windows volume and leave at least 32 GB unallocated. Save the BitLocker recovery
 key, disable Windows Fast Startup, and disable Secure Boot in UEFI settings. If the wizard cannot verify UEFI boot,
 GPT, Windows Boot Manager, and a sufficiently large unallocated extent, it does
-not offer the alongside option.
+not enable the alongside option. Windows is still shown when A-OS was started
+through a legacy USB entry or when unallocated space is missing, together with
+the exact step needed to make the dual-boot target installable. Detection checks
+both the Windows EFI loader on disk and the firmware's Windows Boot Manager
+entry so valid Windows installations are not hidden by incomplete filesystem
+metadata.
 
 The update indicator compares the packaged version with Firebase. An update is
 never installed automatically: after the user approves it, the native updater

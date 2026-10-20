@@ -41,6 +41,42 @@ class InstallerSafetyTests(unittest.TestCase):
 """
         self.assertEqual(SERVER.parse_parted_free(output), [])
 
+    def test_windows_firmware_partition_uuid_parser(self):
+        output = r"""BootCurrent: 0004
+Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x800,0x32000)/File(\EFI\Microsoft\Boot\bootmgfw.efi)
+"""
+        with patch.object(SERVER, "run", return_value=(0, output, "")):
+            self.assertEqual(
+                SERVER.windows_firmware_partition_uuids(),
+                {"12345678-1234-4abc-9def-1234567890ab"},
+            )
+
+    def test_windows_esp_accepts_firmware_entry_when_mount_probe_fails(self):
+        device = {
+            "children": [{
+                "path": "/dev/nvme0n1p1",
+                "parttype": SERVER.EFI_SYSTEM_GUID,
+                "partuuid": "12345678-1234-4abc-9def-1234567890ab",
+                "fstype": "",
+            }],
+        }
+        with patch.object(SERVER, "windows_firmware_partition_uuids", return_value={"12345678-1234-4abc-9def-1234567890ab"}):
+            with patch.object(SERVER, "partition_has_windows_loader", return_value=False):
+                self.assertEqual(SERVER.windows_esp_for_disk(device), "/dev/nvme0n1p1")
+
+    def test_windows_esp_probes_fat_partition_when_guid_is_missing(self):
+        device = {
+            "children": [{
+                "path": "/dev/sda1",
+                "parttype": "",
+                "partuuid": "",
+                "fstype": "vfat",
+            }],
+        }
+        with patch.object(SERVER, "windows_firmware_partition_uuids", return_value=set()):
+            with patch.object(SERVER, "partition_has_windows_loader", return_value=True):
+                self.assertEqual(SERVER.windows_esp_for_disk(device), "/dev/sda1")
+
     def test_alongside_target_rejects_a_command_path_before_enumeration(self):
         with patch.object(SERVER, "storage_targets") as targets:
             with self.assertRaisesRegex(RuntimeError, "unsafe"):
@@ -63,6 +99,24 @@ class InstallerSafetyTests(unittest.TestCase):
         self.assertEqual(targets[0]["name"], "Windows local disk (C:) - space required")
         self.assertFalse(targets[0]["installable"])
         self.assertIn("32 GB", targets[0]["blockedReason"])
+
+    def test_legacy_boot_still_reports_windows_and_requests_uefi(self):
+        device = {
+            "type": "disk",
+            "rm": False,
+            "path": "/dev/nvme0n1",
+            "pttype": "gpt",
+            "children": [],
+        }
+        region = {"startMiB": 200000, "endMiB": 240000, "size": 40000 * SERVER.MIB}
+        with patch.object(SERVER.Path, "is_dir", return_value=False):
+            with patch.object(SERVER, "windows_esp_for_disk", return_value="/dev/nvme0n1p1"):
+                with patch.object(SERVER, "disk_free_regions", return_value=[region]):
+                    targets = SERVER.alongside_targets([device], "/dev/sdb")
+        self.assertEqual(len(targets), 1)
+        self.assertFalse(targets[0]["installable"])
+        self.assertIn("UEFI entry", targets[0]["blockedReason"])
+        self.assertIn("Windows detected", targets[0]["description"])
 
     def test_grub_menu_keeps_windows_and_aos(self):
         config = SERVER.grub_configuration("aos-system-uuid", "windows-esp-uuid")

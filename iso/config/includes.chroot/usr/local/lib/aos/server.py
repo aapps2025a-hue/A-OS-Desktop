@@ -41,6 +41,7 @@ MIB = 1024 * 1024
 GIB = 1024 * MIB
 MIN_ALONGSIDE_BYTES = 32 * GIB
 EFI_SYSTEM_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+WINDOWS_LOADER = ("EFI", "Microsoft", "Boot", "bootmgfw.efi")
 os.chdir(PACKAGED_ROOT)
 
 
@@ -417,7 +418,7 @@ def live_source_is_removable():
 def block_devices():
     code, output, _ = run([
         "lsblk", "--json", "--bytes", "--output",
-        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTN,PTTYPE",
+        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTUUID,PARTN,PTTYPE",
     ])
     if code != 0:
         return []
@@ -469,20 +470,34 @@ def partition_has_windows_loader(partition):
             if code != 0:
                 return False
             root = mount_dir
-        return (root / "EFI" / "Microsoft" / "Boot" / "bootmgfw.efi").is_file()
+        return root.joinpath(*WINDOWS_LOADER).is_file()
     finally:
         if mount_dir:
             run(["umount", str(mount_dir)], timeout=10)
             shutil.rmtree(mount_dir, ignore_errors=True)
 
 
+def windows_firmware_partition_uuids():
+    code, output, _ = run(["efibootmgr", "-v"], timeout=5)
+    if code != 0:
+        return set()
+    pattern = re.compile(
+        r"GPT,([0-9a-f-]{36}),.*?File\(\\EFI\\Microsoft\\Boot\\bootmgfw\.efi\)",
+        re.IGNORECASE,
+    )
+    return {match.lower() for match in pattern.findall(output)}
+
+
 def windows_esp_for_disk(device):
+    firmware_partitions = windows_firmware_partition_uuids()
     for child in device.get("children") or []:
         parttype = str(child.get("parttype") or "").lower()
         fstype = str(child.get("fstype") or "").lower()
+        partuuid = str(child.get("partuuid") or "").lower()
         path = str(child.get("path") or "")
-        if parttype == EFI_SYSTEM_GUID and fstype in {"vfat", "fat", "fat32"} and path:
-            if partition_has_windows_loader(path):
+        is_efi_candidate = parttype == EFI_SYSTEM_GUID or fstype in {"vfat", "fat", "fat32"}
+        if is_efi_candidate and path:
+            if partition_has_windows_loader(path) or partuuid in firmware_partitions:
                 return path
     return ""
 
@@ -498,8 +513,8 @@ def secure_boot_enabled():
 
 
 def alongside_targets(devices, source):
-    if not Path("/sys/firmware/efi").is_dir():
-        return []
+    uefi_booted = Path("/sys/firmware/efi").is_dir()
+    secure_booted = secure_boot_enabled() if uefi_booted else False
     targets = []
     for device in devices:
         if device.get("type") != "disk" or bool(device.get("rm")):
@@ -511,28 +526,35 @@ def alongside_targets(devices, source):
         if not esp:
             continue
         eligible_regions = [region for region in disk_free_regions(path) if region["size"] >= MIN_ALONGSIDE_BYTES]
+        requirements = []
+        if not uefi_booted:
+            requirements.append("Restart and choose the UEFI entry for this A-OS USB")
+        if secure_booted:
+            requirements.append("Disable Secure Boot in UEFI settings")
         if not eligible_regions:
+            requirements.append("Create at least 32 GB of unallocated space in Windows Disk Management")
+            blocked_reason = "; ".join(requirements)
             targets.append({
                 "id": "alongside-unavailable:" + path,
                 "mode": "alongside",
-                "name": "Windows local disk (C:) - space required",
-                "description": "Create at least 32 GB of unallocated space in Windows Disk Management, then boot this USB again",
+                "name": "Windows local disk (C:) - " + ("space required" if len(requirements) == 1 else "setup required"),
+                "description": "Windows detected on {} | {}".format(path, blocked_reason),
                 "size": 0,
                 "removable": False,
                 "installable": False,
-                "blockedReason": "At least 32 GB of unallocated space is required to keep Windows",
+                "blockedReason": blocked_reason,
                 "disk": path,
                 "esp": esp,
             })
             continue
         for region in eligible_regions:
-            blocked_reason = "Disable Secure Boot in UEFI settings before installing" if secure_boot_enabled() else ""
+            blocked_reason = "; ".join(requirements)
             target_id = "alongside:{}:{}:{}".format(path, region["startMiB"], region["endMiB"])
             targets.append({
                 "id": target_id,
                 "mode": "alongside",
                 "name": "Windows local disk (C:) - install A-OS beside Windows",
-                "description": "Uses only unallocated space on {} | Windows local disk detected{}".format(
+                "description": "Uses only unallocated space on {} | Windows detected{}".format(
                     path, " | " + blocked_reason if blocked_reason else "",
                 ),
                 "size": region["size"],
