@@ -193,7 +193,7 @@
       showInstallProgress(main);
     }).catch(function (error) {
       button.disabled = false;
-      button.textContent = target.mode === "alongside" ? "Install alongside Windows" : "Erase drive and install A-OS";
+      button.textContent = target.autoCreateSpace ? "Create partitions and install A-OS" : target.mode === "alongside" ? "Install alongside Windows" : "Erase drive and install A-OS";
       var old = main.querySelector(".aos-installer__error");
       if (old) old.remove();
       main.insertBefore(element("p", "aos-installer__error", error && error.message ? error.message : "Installation could not start."), main.querySelector(".aos-installer__actions"));
@@ -204,7 +204,8 @@
     var target = selected();
     var isLive = target && target.id === "live";
     var isAlongside = target && target.mode === "alongside";
-    var lead = isLive ? "A-OS will run from the installation media. Changes are not guaranteed to survive a restart." : isAlongside ? "A-OS will use only the selected Windows unallocated space and create persistent storage for accounts, settings, apps, and files." : "A-OS will copy the bootable system and create persistent storage for accounts, settings, apps, and files.";
+    var createsSpace = isAlongside && target.autoCreateSpace;
+    var lead = isLive ? "A-OS will run from the installation media. Changes are not guaranteed to survive a restart." : createsSpace ? "A-OS will check the Windows NTFS volume, shrink it by 32 GB, and create persistent A-OS system and data partitions in the new space." : isAlongside ? "A-OS will use only the selected Windows unallocated space and create persistent storage for accounts, settings, apps, and files." : "A-OS will copy the bootable system and create persistent storage for accounts, settings, apps, and files.";
     var main = mainShell(isLive ? "Start A-OS without installing" : isAlongside ? "Install A-OS on the Windows local disk" : "Ready to install A\u2011OS", lead);
     var summary = element("div", "aos-installer__targets");
     summary.appendChild(targetButton(target));
@@ -214,8 +215,9 @@
       return main;
     }
     var phrase = isAlongside ? "INSTALL ALONGSIDE WINDOWS" : "ERASE " + target.id;
-    var buttonLabel = isAlongside ? "Install alongside Windows" : "Erase drive and install A-OS";
-    main.appendChild(element("p", "aos-installer__warning", isAlongside ? "A-OS will create two partitions inside this unallocated region and add its own UEFI boot entry. Existing Windows, recovery, and EFI partitions will not be formatted. Back up Windows, save your BitLocker recovery key, and disable Secure Boot first." : "Everything on " + target.id + " will be permanently erased. This cannot be undone."));
+    var buttonLabel = createsSpace ? "Create partitions and install A-OS" : isAlongside ? "Install alongside Windows" : "Erase drive and install A-OS";
+    var alongsideWarning = createsSpace ? "A-OS will resize the Windows NTFS system partition after a no-change safety test, then create two A-OS partitions. Back up Windows, connect power, turn off BitLocker, Fast Startup and hibernation, and disable Secure Boot first. A-OS will stop before resizing if any check fails." : "A-OS will create two partitions inside this unallocated region and add its own UEFI boot entry. Existing Windows, recovery, and EFI partitions will not be formatted. Back up Windows, save your BitLocker recovery key, and disable Secure Boot first.";
+    main.appendChild(element("p", "aos-installer__warning", isAlongside ? alongsideWarning : "Everything on " + target.id + " will be permanently erased. This cannot be undone."));
     var label = element("label", "aos-installer__confirm");
     label.appendChild(element("span", "", "Type " + phrase + " to confirm"));
     var confirmation = document.createElement("input");
@@ -260,7 +262,8 @@
           description: item.description || "Detected storage", size: formatBytes(item.size),
           mode: item.mode || "erase",
           removable: Boolean(item.removable), installable: item.installable !== false,
-          blockedReason: item.blockedReason || ""
+          blockedReason: item.blockedReason || "",
+          autoCreateSpace: Boolean(item.autoCreateSpace)
         });
       });
       targets.sort(function (left, right) {

@@ -40,6 +40,9 @@ INSTALL_STATE = {"running": False, "stage": "idle", "progress": 0, "message": ""
 MIB = 1024 * 1024
 GIB = 1024 * MIB
 MIN_ALONGSIDE_BYTES = 32 * GIB
+AUTO_SPACE_BYTES = MIN_ALONGSIDE_BYTES + 4 * MIB
+MIN_WINDOWS_REMAIN_BYTES = 32 * GIB
+NTFS_RESIZE_MARGIN_BYTES = 8 * MIB
 EFI_SYSTEM_GUID = "c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
 WINDOWS_LOADER = ("EFI", "Microsoft", "Boot", "bootmgfw.efi")
 os.chdir(PACKAGED_ROOT)
@@ -458,7 +461,7 @@ def mounted_path(partition):
     return output.splitlines()[0].strip() if code == 0 and output.strip() else ""
 
 
-def partition_has_windows_loader(partition):
+def partition_has_path(partition, components):
     existing = mounted_path(partition)
     mount_dir = None
     try:
@@ -470,11 +473,19 @@ def partition_has_windows_loader(partition):
             if code != 0:
                 return False
             root = mount_dir
-        return root.joinpath(*WINDOWS_LOADER).is_file()
+        return root.joinpath(*components).is_file()
     finally:
         if mount_dir:
             run(["umount", str(mount_dir)], timeout=10)
             shutil.rmtree(mount_dir, ignore_errors=True)
+
+
+def partition_has_windows_loader(partition):
+    return partition_has_path(partition, WINDOWS_LOADER)
+
+
+def partition_has_windows_installation(partition):
+    return partition_has_path(partition, ("Windows", "System32", "config", "SYSTEM"))
 
 
 def windows_firmware_partition_uuids():
@@ -500,6 +511,21 @@ def windows_esp_for_disk(device):
             if partition_has_windows_loader(path) or partuuid in firmware_partitions:
                 return path
     return ""
+
+
+def windows_system_partition(device):
+    candidates = []
+    for child in device.get("children") or []:
+        path = str(child.get("path") or "")
+        fstype = str(child.get("fstype") or "").lower()
+        size = int(child.get("size") or 0)
+        partn = str(child.get("partn") or "")
+        if path and partn.isdigit() and fstype == "ntfs" and size >= MIN_WINDOWS_REMAIN_BYTES + AUTO_SPACE_BYTES:
+            candidates.append(child)
+    for child in sorted(candidates, key=lambda item: int(item.get("size") or 0), reverse=True):
+        if partition_has_windows_installation(str(child.get("path") or "")):
+            return child
+    return None
 
 
 def secure_boot_enabled():
@@ -532,20 +558,43 @@ def alongside_targets(devices, source):
         if secure_booted:
             requirements.append("Disable Secure Boot in UEFI settings")
         if not eligible_regions:
-            requirements.append("Create at least 32 GB of unallocated space in Windows Disk Management")
-            blocked_reason = "; ".join(requirements)
-            targets.append({
-                "id": "alongside-unavailable:" + path,
-                "mode": "alongside",
-                "name": "Windows local disk (C:) - " + ("space required" if len(requirements) == 1 else "setup required"),
-                "description": "Windows detected on {} | {}".format(path, blocked_reason),
-                "size": 0,
-                "removable": False,
-                "installable": False,
-                "blockedReason": blocked_reason,
-                "disk": path,
-                "esp": esp,
-            })
+            windows_partition = windows_system_partition(device)
+            if windows_partition:
+                partn = int(windows_partition["partn"])
+                blocked_reason = "; ".join(requirements)
+                targets.append({
+                    "id": "alongside-auto:{}:{}".format(path, partn),
+                    "mode": "alongside",
+                    "name": "Windows local disk (C:) - create A-OS partitions",
+                    "description": "No empty partition was found. A-OS will safely check and shrink Windows by 32 GB, then create its partitions{}".format(
+                        " | " + blocked_reason if blocked_reason else "",
+                    ),
+                    "size": MIN_ALONGSIDE_BYTES,
+                    "removable": False,
+                    "installable": not blocked_reason,
+                    "blockedReason": blocked_reason,
+                    "disk": path,
+                    "esp": esp,
+                    "autoCreateSpace": True,
+                    "resizePartition": str(windows_partition["path"]),
+                    "resizePartitionNumber": partn,
+                })
+            else:
+                requirements.append("A-OS could not safely identify a resizable Windows NTFS system partition")
+                requirements.append("Create at least 32 GB of unallocated space in Windows Disk Management")
+                blocked_reason = "; ".join(requirements)
+                targets.append({
+                    "id": "alongside-unavailable:" + path,
+                    "mode": "alongside",
+                    "name": "Windows local disk (C:) - setup required",
+                    "description": "Windows detected on {} | {}".format(path, blocked_reason),
+                    "size": 0,
+                    "removable": False,
+                    "installable": False,
+                    "blockedReason": blocked_reason,
+                    "disk": path,
+                    "esp": esp,
+                })
             continue
         for region in eligible_regions:
             blocked_reason = "; ".join(requirements)
@@ -681,8 +730,10 @@ def validate_install_target(target):
 
 
 def validate_alongside_target(target):
-    pattern = r"alongside:(/dev/(?:sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)):(\d+):(\d+)"
-    if not re.fullmatch(pattern, str(target or "")):
+    disk_pattern = r"/dev/(?:sd[a-z]+|vd[a-z]+|xvd[a-z]+|nvme\d+n\d+|mmcblk\d+)"
+    region_pattern = r"alongside:{}:(\d+):(\d+)".format(disk_pattern)
+    automatic_pattern = r"alongside-auto:{}:(\d+)".format(disk_pattern)
+    if not re.fullmatch(region_pattern, str(target or "")) and not re.fullmatch(automatic_pattern, str(target or "")):
         raise RuntimeError("A-OS rejected an unsafe alongside-install target")
     listed = {item["id"]: item for item in storage_targets()["targets"] if item.get("mode") == "alongside"}
     item = listed.get(target)
@@ -693,6 +744,81 @@ def validate_alongside_target(target):
     if not Path("/sys/firmware/efi").is_dir():
         raise RuntimeError("Install alongside Windows requires UEFI boot mode")
     return item
+
+
+def parse_parted_partitions(output):
+    partitions = {}
+    pattern = re.compile(r"^(\d+):(\d+)B:(\d+)B:(\d+)B:")
+    for line in str(output or "").splitlines():
+        match = pattern.match(line.strip())
+        if not match:
+            continue
+        number, start, end, size = (int(value) for value in match.groups())
+        partitions[number] = {"number": number, "start": start, "end": end, "size": size}
+    return partitions
+
+
+def partition_geometry(device, number):
+    output = require_command(["parted", "-m", "-s", device, "unit", "B", "print"], timeout=15)
+    geometry = parse_parted_partitions(output).get(int(number))
+    if not geometry:
+        raise RuntimeError("A-OS could not read the Windows partition geometry")
+    return geometry
+
+
+def create_alongside_space(item):
+    device = str(item["disk"])
+    partition = str(item.get("resizePartition") or "")
+    number = int(item.get("resizePartitionNumber") or 0)
+    current = {int(value.get("partn")): value for value in list_partitions(device) if str(value.get("partn") or "").isdigit()}
+    listed = current.get(number)
+    if not listed or str(listed.get("path") or "") != partition or str(listed.get("fstype") or "").lower() != "ntfs":
+        raise RuntimeError("The Windows NTFS partition changed after it was selected")
+    if mounted_path(partition):
+        raise RuntimeError("The Windows partition is mounted. Restart from the A-OS USB before installing")
+    geometry = partition_geometry(device, number)
+    new_end_bytes = int(geometry["end"]) + 1 - AUTO_SPACE_BYTES
+    new_end_mib = int(math.floor(new_end_bytes / MIB))
+    new_partition_bytes = new_end_mib * MIB - int(geometry["start"])
+    new_filesystem_bytes = new_partition_bytes - NTFS_RESIZE_MARGIN_BYTES
+    if new_filesystem_bytes < MIN_WINDOWS_REMAIN_BYTES:
+        raise RuntimeError("The Windows partition is too small to create a 32 GB A-OS partition area")
+
+    check_command = ["ntfsresize", "--no-action", "--no-progress-bar", "--size", str(new_filesystem_bytes), partition]
+    code, output, error = run(check_command, timeout=600)
+    if code != 0:
+        detail = (error or output or "NTFS validation failed").splitlines()[-1]
+        raise RuntimeError(
+            "A-OS did not resize Windows because the safety check failed. "
+            "Turn off BitLocker, Fast Startup and hibernation, run the Windows disk error check, and keep at least 32 GB free. "
+            "Details: " + detail
+        )
+
+    set_job_state(
+        INSTALL_STATE, INSTALL_LOCK, stage="resizing", progress=4,
+        message="Windows passed the safety check. Creating 32 GB of unallocated space",
+    )
+    require_command([
+        "ntfsresize", "--force", "--no-progress-bar", "--size", str(new_filesystem_bytes), partition,
+    ], timeout=3600)
+    require_command([
+        "parted", "-s", device, "unit", "MiB", "resizepart", str(number), str(new_end_mib),
+    ], timeout=120)
+    require_command(["partprobe", device], timeout=30)
+    run(["udevadm", "settle"], timeout=30)
+    time.sleep(1)
+    regions = [region for region in disk_free_regions(device) if region["size"] >= MIN_ALONGSIDE_BYTES]
+    if not regions:
+        raise RuntimeError("Windows was resized, but A-OS could not find the new unallocated partition area")
+    region = min(regions, key=lambda value: abs(int(value["startMiB"]) - new_end_mib))
+    prepared = dict(item)
+    prepared.update({
+        "startMiB": region["startMiB"],
+        "endMiB": region["endMiB"],
+        "size": region["size"],
+        "autoCreateSpace": False,
+    })
+    return prepared
 
 
 def partition_number(partition):
@@ -841,6 +967,12 @@ def install_alongside_worker(target):
         live_medium = Path("/run/live/medium")
         if not live_medium.is_dir() or not (live_medium / "live" / "filesystem.squashfs").is_file():
             raise RuntimeError("The A-OS installation media could not be found")
+        if item.get("autoCreateSpace"):
+            set_job_state(
+                INSTALL_STATE, INSTALL_LOCK, stage="checking", progress=2,
+                message="Checking Windows before creating the A-OS partition area",
+            )
+            item = create_alongside_space(item)
         system_mib = max(4096, int(math.ceil(directory_size(live_medium) / MIB)) + 1024)
         available_mib = int(item["endMiB"]) - int(item["startMiB"])
         if available_mib < system_mib + 8192:
@@ -1333,9 +1465,9 @@ class AosHandler(SimpleHTTPRequestHandler):
                 if mode == "alongside":
                     if confirmation != "INSTALL ALONGSIDE WINDOWS":
                         raise RuntimeError("Type INSTALL ALONGSIDE WINDOWS to confirm")
-                    validate_alongside_target(target)
+                    install_target = validate_alongside_target(target)
                     worker = install_alongside_worker
-                    message = "Preparing unallocated space beside Windows"
+                    message = "Checking Windows and creating partition space" if install_target.get("autoCreateSpace") else "Preparing unallocated space beside Windows"
                 elif mode == "erase":
                     if confirmation != "ERASE " + target:
                         raise RuntimeError("Type ERASE followed by the exact drive path")

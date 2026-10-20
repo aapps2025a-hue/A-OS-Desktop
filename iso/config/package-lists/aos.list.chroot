@@ -16,6 +16,7 @@ grub-efi-amd64-bin
 efibootmgr
 dosfstools
 e2fsprogs
+ntfs-3g
 util-linux
 rsync
 dbus-x11

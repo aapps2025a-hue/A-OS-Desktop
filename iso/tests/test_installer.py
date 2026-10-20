@@ -77,6 +77,27 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
             with patch.object(SERVER, "partition_has_windows_loader", return_value=True):
                 self.assertEqual(SERVER.windows_esp_for_disk(device), "/dev/sda1")
 
+    def test_windows_system_partition_requires_the_windows_system_hive(self):
+        device = {
+            "children": [
+                {"path": "/dev/nvme0n1p3", "partn": "3", "fstype": "ntfs", "size": 300 * SERVER.GIB},
+                {"path": "/dev/nvme0n1p4", "partn": "4", "fstype": "ntfs", "size": 400 * SERVER.GIB},
+            ],
+        }
+        with patch.object(SERVER, "partition_has_windows_installation", side_effect=lambda path: path == "/dev/nvme0n1p3"):
+            selected = SERVER.windows_system_partition(device)
+        self.assertEqual(selected["path"], "/dev/nvme0n1p3")
+
+    def test_parted_partition_geometry_parser_uses_byte_offsets(self):
+        output = """BYT;
+/dev/nvme0n1:512110190592B:nvme:512:512:gpt:Disk:;
+3:525336576B:500000000000B:499474663425B:ntfs:Basic data partition:msftdata;
+"""
+        geometry = SERVER.parse_parted_partitions(output)[3]
+        self.assertEqual(geometry["start"], 525336576)
+        self.assertEqual(geometry["end"], 500000000000)
+        self.assertEqual(geometry["size"], 499474663425)
+
     def test_alongside_target_rejects_a_command_path_before_enumeration(self):
         with patch.object(SERVER, "storage_targets") as targets:
             with self.assertRaisesRegex(RuntimeError, "unsafe"):
@@ -96,9 +117,84 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
                 with patch.object(SERVER, "disk_free_regions", return_value=[]):
                     targets = SERVER.alongside_targets([device], "/dev/sdb")
         self.assertEqual(len(targets), 1)
-        self.assertEqual(targets[0]["name"], "Windows local disk (C:) - space required")
+        self.assertEqual(targets[0]["name"], "Windows local disk (C:) - setup required")
         self.assertFalse(targets[0]["installable"])
         self.assertIn("32 GB", targets[0]["blockedReason"])
+
+    def test_windows_disk_without_space_offers_automatic_partition_creation(self):
+        windows_partition = {
+            "path": "/dev/nvme0n1p3",
+            "partn": "3",
+            "fstype": "ntfs",
+            "size": 400 * SERVER.GIB,
+        }
+        device = {
+            "type": "disk",
+            "rm": False,
+            "path": "/dev/nvme0n1",
+            "pttype": "gpt",
+            "children": [windows_partition],
+        }
+        with patch.object(SERVER.os.path, "realpath", side_effect=lambda value: value):
+            with patch.object(SERVER.Path, "is_dir", return_value=True):
+                with patch.object(SERVER, "windows_esp_for_disk", return_value="/dev/nvme0n1p1"):
+                    with patch.object(SERVER, "disk_free_regions", return_value=[]):
+                        with patch.object(SERVER, "windows_system_partition", return_value=windows_partition):
+                            targets = SERVER.alongside_targets([device], "/dev/sdb")
+        self.assertEqual(len(targets), 1)
+        self.assertTrue(targets[0]["installable"])
+        self.assertTrue(targets[0]["autoCreateSpace"])
+        self.assertEqual(targets[0]["id"], "alongside-auto:/dev/nvme0n1:3")
+        self.assertEqual(targets[0]["resizePartition"], "/dev/nvme0n1p3")
+
+    def test_automatic_partition_creation_checks_ntfs_before_resizing(self):
+        item = {
+            "disk": "/dev/nvme0n1",
+            "resizePartition": "/dev/nvme0n1p3",
+            "resizePartitionNumber": 3,
+        }
+        partition = {"path": "/dev/nvme0n1p3", "partn": "3", "fstype": "ntfs"}
+        end = 450 * SERVER.GIB
+        geometry = {"number": 3, "start": SERVER.GIB, "end": end - 1, "size": end - SERVER.GIB}
+        region = {"startMiB": 417788, "endMiB": 450560, "size": 32772 * SERVER.MIB}
+
+        def command_result(command, timeout=SERVER.COMMAND_TIMEOUT):
+            if command[0] == "ntfsresize":
+                return 0, "The read-only test succeeded", ""
+            return 0, "", ""
+
+        with patch.object(SERVER, "list_partitions", return_value=[partition]):
+            with patch.object(SERVER, "mounted_path", return_value=""):
+                with patch.object(SERVER, "partition_geometry", return_value=geometry):
+                    with patch.object(SERVER, "run", side_effect=command_result) as run_command:
+                        with patch.object(SERVER, "require_command", return_value="") as require:
+                            with patch.object(SERVER, "disk_free_regions", return_value=[region]):
+                                with patch.object(SERVER.time, "sleep"):
+                                    prepared = SERVER.create_alongside_space(item)
+
+        self.assertEqual(prepared["startMiB"], region["startMiB"])
+        self.assertEqual(prepared["endMiB"], region["endMiB"])
+        self.assertFalse(prepared["autoCreateSpace"])
+        self.assertEqual(run_command.call_args_list[0].args[0][0:3], ["ntfsresize", "--no-action", "--no-progress-bar"])
+        self.assertEqual(require.call_args_list[0].args[0][0:2], ["ntfsresize", "--force"])
+        self.assertIn("resizepart", require.call_args_list[1].args[0])
+
+    def test_automatic_partition_creation_stops_when_ntfs_check_fails(self):
+        item = {
+            "disk": "/dev/sda",
+            "resizePartition": "/dev/sda3",
+            "resizePartitionNumber": 3,
+        }
+        partition = {"path": "/dev/sda3", "partn": "3", "fstype": "ntfs"}
+        geometry = {"number": 3, "start": SERVER.GIB, "end": 200 * SERVER.GIB - 1, "size": 199 * SERVER.GIB}
+        with patch.object(SERVER, "list_partitions", return_value=[partition]):
+            with patch.object(SERVER, "mounted_path", return_value=""):
+                with patch.object(SERVER, "partition_geometry", return_value=geometry):
+                    with patch.object(SERVER, "run", return_value=(1, "", "NTFS is hibernated")):
+                        with patch.object(SERVER, "require_command") as require:
+                            with self.assertRaisesRegex(RuntimeError, "safety check failed"):
+                                SERVER.create_alongside_space(item)
+        require.assert_not_called()
 
     def test_legacy_boot_still_reports_windows_and_requests_uefi(self):
         device = {

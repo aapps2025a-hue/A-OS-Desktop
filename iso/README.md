@@ -16,23 +16,22 @@ scanning and connection, BlueZ Bluetooth pairing, PipeWire sound volume,
 supported laptop backlight brightness, hardware battery status, and device
 restart/shutdown. The installation wizard supports both a dedicated
 drive and a conservative UEFI dual-boot installation beside Windows. The
-dual-boot path only uses space that Windows has already left unallocated; it
-does not resize NTFS, format the Windows EFI partition, or alter Windows and
-recovery partition boundaries. It creates separate A-OS system and persistence
-partitions, installs a self-contained A-OS UEFI loader, and keeps Windows Boot
+dual-boot path uses existing unallocated space when available. If none exists,
+the wizard can run an NTFS no-change safety test, shrink the identified Windows
+system partition by 32 GB, and create separate A-OS system and persistence
+partitions in that new space. It never formats the Windows EFI or recovery
+partitions. It installs a self-contained A-OS UEFI loader and keeps Windows Boot
 Manager available in the A-OS boot menu. The dedicated-drive path still erases
 the selected drive and requires the exact target path to be typed.
 
-Before a dual-boot installation, use Windows Disk Management to shrink the
-Windows volume and leave at least 32 GB unallocated. Save the BitLocker recovery
-key, disable Windows Fast Startup, and disable Secure Boot in UEFI settings. If the wizard cannot verify UEFI boot,
-GPT, Windows Boot Manager, and a sufficiently large unallocated extent, it does
-not enable the alongside option. Windows is still shown when A-OS was started
-through a legacy USB entry or when unallocated space is missing, together with
-the exact step needed to make the dual-boot target installable. Detection checks
-both the Windows EFI loader on disk and the firmware's Windows Boot Manager
-entry so valid Windows installations are not hidden by incomplete filesystem
-metadata.
+Before a dual-boot installation, back up Windows and save the BitLocker recovery
+key. Turn off BitLocker, Windows Fast Startup and hibernation, then disable
+Secure Boot in UEFI settings. The installer refuses automatic resizing when the
+NTFS volume is mounted, hibernated, dirty, encrypted, too full, or otherwise
+fails the read-only resize test. In that case, use Windows Disk Management to
+leave at least 32 GB unallocated and retry. Detection checks both the Windows EFI
+loader on disk and the firmware's Windows Boot Manager entry so valid Windows
+installations are not hidden by incomplete filesystem metadata.
 
 The update indicator compares the packaged version with Firebase. An update is
 never installed automatically: after the user approves it, the native updater
