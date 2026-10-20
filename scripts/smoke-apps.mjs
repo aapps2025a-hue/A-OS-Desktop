@@ -174,9 +174,17 @@ async function main() {
   }
 
   await waitFor(
-    `[...document.querySelectorAll('img')].some((image) => decodeURIComponent(image.src).endsWith('/assets/icons/ISO.png'))`,
-    "the custom ISO file icon"
+    `JSON.parse(localStorage.getItem("aos-files") || "[]").some((file) => file.name === "A-OS Desktop.iso" && file.icon === "ISO.png")`,
+    "the custom ISO extension mapping"
   );
+  const isoIconResponse = await evaluate(`fetch("./assets/icons/ISO.png").then((response) => ({
+    ok: response.ok,
+    contentType: response.headers.get("content-type") || "",
+    size: Number(response.headers.get("content-length") || 0)
+  }))`);
+  if (!isoIconResponse.ok || !isoIconResponse.contentType.includes("image/png") || isoIconResponse.size < 1000) {
+    throw new Error(`The custom ISO icon did not load correctly: ${JSON.stringify(isoIconResponse)}`);
+  }
 
   await evaluate(`${appButton("Settings")}.click()`);
   await waitFor(`[...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Appearance")`, "Appearance settings");
