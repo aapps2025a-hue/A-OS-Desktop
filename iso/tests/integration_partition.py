@@ -1,5 +1,6 @@
 """Destructive operations are restricted to a freshly created disposable loop disk."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -7,7 +8,10 @@ import tempfile
 
 
 def command(*args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT).strip()
+    result = subprocess.run(args, text=True, capture_output=True)
+    if result.returncode:
+        raise RuntimeError("{}\n{}\n{}".format(args, result.stdout, result.stderr))
+    return result.stdout.strip()
 
 
 def main():
@@ -38,6 +42,7 @@ def main():
             command("udevadm", "trigger", "--action=change", "/sys/class/block/" + Path(partition).name)
             command("udevadm", "settle")
             original = server.partition_geometry(loop, 1)
+            original_entry = json.loads(command("sfdisk", "--json", loop))["partitiontable"]["partitions"][0]
             print("Detected test partitions:", server.list_partitions(loop), flush=True)
             assert server.list_partitions(loop)[0]["partn"] == 1
             prepared = server.create_alongside_space({
@@ -48,12 +53,17 @@ def main():
             resized = server.partition_geometry(loop, 1)
             assert resized["start"] == original["start"]
             assert resized["end"] < original["end"]
-            assert command("ntfscat", partition, "/keep.txt") == marker.read_text().strip()
+            resized_entry = json.loads(command("sfdisk", "--json", loop))["partitiontable"]["partitions"][0]
+            assert {k: v for k, v in original_entry.items() if k != "size"} == {
+                k: v for k, v in resized_entry.items() if k != "size"
+            }
+            # ntfsresize marks the volume for Windows chkdsk; -f permits read-only inspection.
+            assert command("ntfscat", "-f", partition, "/keep.txt") == marker.read_text().strip()
             path, number = server.create_partition(
                 loop, "AOS_TEST", prepared["startMiB"], prepared["endMiB"],
             )
             assert path == loop + "p2" and number == 2
-            assert command("ntfscat", partition, "/keep.txt") == marker.read_text().strip()
+            assert command("ntfscat", "-f", partition, "/keep.txt") == marker.read_text().strip()
             print("PASS: real NTFS resize, data preservation, partition discovery and creation")
         finally:
             command("losetup", "-d", loop)
