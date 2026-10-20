@@ -48,7 +48,7 @@ while true; do
     $chromium_gpu_flags \
     --kiosk \
     --start-fullscreen \
-    --app="http://127.0.0.1:5000/index.html?aosLiveIso=1" \
+    --app="http://127.0.0.1:5000/a-os.html?aosLiveIso=1" \
     --no-first-run \
     --no-default-browser-check \
     --noerrdialogs \

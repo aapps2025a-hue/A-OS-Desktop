@@ -184,6 +184,18 @@
     }
   };
 
+  window.aosAudioBridge = {
+    setVolume: function (percentage) {
+      return post("/__aos/volume", {percentage: Number(percentage)}).then(refreshSystem);
+    }
+  };
+
+  window.aosDisplayBridge = {
+    setBrightness: function (percentage) {
+      return post("/__aos/brightness", {percentage: Number(percentage)}).then(refreshSystem);
+    }
+  };
+
   window.aosPowerBridge = {
     perform: function (action) {
       var normalized = action === "restart" ? "restart" : action === "hibernate" ? "hibernate" : "shutdown";

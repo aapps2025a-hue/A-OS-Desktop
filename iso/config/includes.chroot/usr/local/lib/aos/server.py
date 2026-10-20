@@ -19,6 +19,7 @@ import time
 
 PACKAGED_ROOT = Path(os.environ.get("AOS_PUBLIC_ROOT", "/opt/a-os/public")).resolve()
 STATE_ROOT = Path(os.environ.get("AOS_STATE_ROOT", "/var/lib/aos")).resolve()
+BACKLIGHT_ROOT = Path(os.environ.get("AOS_BACKLIGHT_ROOT", "/sys/class/backlight")).resolve()
 RELEASES_ROOT = STATE_ROOT / "releases"
 ACTIVE_RELEASE = STATE_ROOT / "active-public"
 READY_FILE = Path(os.environ.get("AOS_READY_FILE", "/tmp/aos-browser-ready"))
@@ -128,6 +129,87 @@ def battery_state():
         except (OSError, ValueError):
             continue
     return {"available": False, "percentage": 0, "charging": False, "status": "unknown"}
+
+
+def run_as_aos(command, timeout=COMMAND_TIMEOUT):
+    code, uid, error = run(["id", "-u", "aos"], timeout=2)
+    if code != 0 or not uid.isdigit():
+        return code or 1, "", error or "The A-OS audio session is not available"
+    return run([
+        "runuser", "-u", "aos", "--", "env", "XDG_RUNTIME_DIR=/run/user/" + uid,
+        *command,
+    ], timeout=timeout)
+
+
+def volume_state():
+    code, output, error = run_as_aos(["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"], timeout=4)
+    match = re.search(r"Volume:\s*([0-9]+(?:\.[0-9]+)?)", output)
+    if code != 0 or not match:
+        return {"available": False, "percentage": 0, "muted": False, "error": error}
+    percentage = max(0, min(100, round(float(match.group(1)) * 100)))
+    return {"available": True, "percentage": percentage, "muted": "[MUTED]" in output.upper()}
+
+
+def set_volume(value):
+    try:
+        percentage = max(0, min(100, round(float(value))))
+    except (TypeError, ValueError):
+        raise RuntimeError("Choose a volume between 0 and 100")
+    code, output, error = run_as_aos([
+        "wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", str(percentage) + "%",
+    ], timeout=5)
+    if code != 0:
+        raise RuntimeError(error or output or "A-OS could not change the sound volume")
+    code, output, error = run_as_aos([
+        "wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "1" if percentage == 0 else "0",
+    ], timeout=5)
+    if code != 0:
+        raise RuntimeError(error or output or "A-OS could not change the sound mute state")
+    return volume_state()
+
+
+def backlight_device():
+    try:
+        devices = sorted(path for path in BACKLIGHT_ROOT.iterdir() if path.is_dir())
+    except OSError:
+        return None
+    for device in devices:
+        try:
+            maximum = int((device / "max_brightness").read_text().strip())
+            current = int((device / "brightness").read_text().strip())
+            if maximum > 0:
+                return device, maximum, current
+        except (OSError, ValueError):
+            continue
+    return None
+
+
+def brightness_state():
+    device = backlight_device()
+    if not device:
+        return {"available": False, "percentage": 100}
+    _, maximum, current = device
+    return {
+        "available": True,
+        "percentage": max(1, min(100, round(current * 100 / maximum))),
+    }
+
+
+def set_brightness(value):
+    try:
+        percentage = max(5, min(100, round(float(value))))
+    except (TypeError, ValueError):
+        raise RuntimeError("Choose a brightness between 5 and 100")
+    device = backlight_device()
+    if not device:
+        raise RuntimeError("This display does not expose a hardware brightness control")
+    path, maximum, _ = device
+    raw_value = max(1, min(maximum, round(maximum * percentage / 100)))
+    try:
+        (path / "brightness").write_text(str(raw_value), encoding="ascii")
+    except OSError as error:
+        raise RuntimeError("A-OS could not change this display's brightness") from error
+    return brightness_state()
 
 
 def device_info():
@@ -301,6 +383,8 @@ def system_state():
         "networking": {"enabled": networking_enabled()},
         "connectivity": network_health(),
         "battery": battery_state(),
+        "volume": volume_state(),
+        "brightness": brightness_state(),
         "wifi": {"enabled": wifi_enabled(), "network": current_network()},
         "bluetooth": {"enabled": bluetooth_enabled()},
         "microphoneActive": microphone_active(),
@@ -1179,6 +1263,18 @@ class AosHandler(SimpleHTTPRequestHandler):
             if enabled and code == 0:
                 run(["bluetoothctl", "pairable", "on"])
             self._json(200 if code == 0 else 500, {"ok": code == 0, "enabled": enabled, "error": error})
+            return
+        if route == "/__aos/volume":
+            try:
+                self._json(200, {"ok": True, **set_volume(body.get("percentage"))})
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
+            return
+        if route == "/__aos/brightness":
+            try:
+                self._json(200, {"ok": True, **set_brightness(body.get("percentage"))})
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
             return
         if route == "/__aos/python/run":
             try:

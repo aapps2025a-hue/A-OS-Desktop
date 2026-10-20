@@ -1,6 +1,7 @@
 import importlib.util
 import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import MagicMock, call, patch
 
@@ -146,6 +147,44 @@ Boot0007* A-OS
         self.assertTrue(health["online"])
         self.assertTrue(health["dns"])
         self.assertEqual(health["message"], "Internet connection is working")
+
+    def test_volume_state_reads_pipewire_default_sink(self):
+        with patch.object(SERVER, "run_as_aos", return_value=(0, "Volume: 0.65 [MUTED]", "")):
+            state = SERVER.volume_state()
+        self.assertTrue(state["available"])
+        self.assertEqual(state["percentage"], 65)
+        self.assertTrue(state["muted"])
+
+    def test_set_volume_changes_pipewire_volume_and_mute(self):
+        with patch.object(SERVER, "run_as_aos", return_value=(0, "", "")) as command:
+            with patch.object(SERVER, "volume_state", return_value={"available": True, "percentage": 42, "muted": False}):
+                state = SERVER.set_volume(42)
+        self.assertEqual(state["percentage"], 42)
+        self.assertEqual(command.call_args_list, [
+            call(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "42%"], timeout=5),
+            call(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "0"], timeout=5),
+        ])
+
+    def test_brightness_state_and_write_use_hardware_backlight(self):
+        original_root = SERVER.BACKLIGHT_ROOT
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            device = root / "intel_backlight"
+            device.mkdir()
+            (device / "max_brightness").write_text("1000")
+            (device / "brightness").write_text("600")
+            SERVER.BACKLIGHT_ROOT = root
+            try:
+                self.assertEqual(SERVER.brightness_state(), {"available": True, "percentage": 60})
+                self.assertEqual(SERVER.set_brightness(35), {"available": True, "percentage": 35})
+                self.assertEqual((device / "brightness").read_text(), "350")
+            finally:
+                SERVER.BACKLIGHT_ROOT = original_root
+
+    def test_iso_kiosk_starts_the_real_aos_page(self):
+        script = (REPOSITORY / "iso/config/includes.chroot/etc/skel/.xinitrc").read_text(encoding="utf-8")
+        self.assertIn("/a-os.html?aosLiveIso=1", script)
+        self.assertNotIn("/index.html?aosLiveIso=1", script)
 
 
 if __name__ == "__main__":

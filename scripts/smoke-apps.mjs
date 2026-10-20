@@ -6,6 +6,7 @@ import { join } from "node:path";
 const chrome = process.env.AOS_CHROME_BIN;
 const url = process.env.AOS_SMOKE_URL || "http://127.0.0.1:8765/";
 const port = Number(process.env.AOS_CDP_PORT || 9339);
+const nativeIso = new URL(url).searchParams.get("aosLiveIso") === "1";
 const profile = mkdtempSync(join(tmpdir(), "aos-app-smoke-"));
 const requiredApps = [
   "OSInternet",
@@ -142,6 +143,20 @@ async function main() {
     await sleep(250);
   }
   await waitFor(`${appButton("Files")} != null`, "the A-OS desktop", 1000);
+
+  if (nativeIso) {
+    await evaluate(`document.querySelector(".shelf button.status").click()`);
+    await waitFor(`Boolean(document.querySelector(".quick"))`, "the ISO quick settings panel");
+    await waitFor(
+      `Boolean(document.querySelector('.quick label[data-aos-hardware-control="volume"] input[type="range"]'))`,
+      "the native sound control"
+    );
+    await waitFor(
+      `Boolean(document.querySelector('.quick label[data-aos-hardware-control="brightness"] input[type="range"]'))`,
+      "the native brightness control"
+    );
+    await evaluate(`document.querySelector(".shelf button.status").click()`);
+  }
 
   for (const label of requiredApps) {
     await waitFor(`${appButton(label)} != null`, `${label} on the taskbar`);

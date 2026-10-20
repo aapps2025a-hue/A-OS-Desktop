@@ -55,7 +55,7 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           chrome_bin=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
-          AOS_CHROME_BIN="$chrome_bin" node scripts/smoke-apps.mjs
+          AOS_CHROME_BIN="$chrome_bin" AOS_SMOKE_URL="http://127.0.0.1:8765/a-os.html?aosLiveIso=1" node scripts/smoke-apps.mjs
 
       - name: Build bootable ISO hybrid
         working-directory: iso

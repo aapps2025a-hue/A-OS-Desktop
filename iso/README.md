@@ -12,8 +12,9 @@ only writes the hybrid image and does not display or animate an operating-system
 splash itself.
 
 The native bridge provides a master Internet switch, real NetworkManager Wi-Fi
-scanning and connection, BlueZ Bluetooth pairing, hardware battery status, and
-device restart/shutdown. The installation wizard supports both a dedicated
+scanning and connection, BlueZ Bluetooth pairing, PipeWire sound volume,
+supported laptop backlight brightness, hardware battery status, and device
+restart/shutdown. The installation wizard supports both a dedicated
 drive and a conservative UEFI dual-boot installation beside Windows. The
 dual-boot path only uses space that Windows has already left unallocated; it
 does not resize NTFS, format the Windows EFI partition, or alter Windows and

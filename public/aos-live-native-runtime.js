@@ -10,6 +10,7 @@
   var scanTimer = 0;
   var mutationTimer = 0;
   var emojiAssetsPromise = null;
+  var hardwareControlTimer = 0;
 
   function notify(message) {
     window.dispatchEvent(new CustomEvent("aos-notification", {
@@ -329,6 +330,74 @@
         button.classList.toggle("on", Boolean(state.bluetooth.enabled));
       }
     });
+    updateHardwareSliders(state);
+  }
+
+  function controlImage(name, alt) {
+    var image = document.createElement("img");
+    image.src = new URL("./assets/icons/" + name, baseUrl).href;
+    image.alt = alt || "";
+    return image;
+  }
+
+  function applyHardwareValue(kind, input) {
+    window.clearTimeout(hardwareControlTimer);
+    hardwareControlTimer = window.setTimeout(function () {
+      var operation = kind === "volume"
+        ? window.aosAudioBridge.setVolume(input.value)
+        : window.aosDisplayBridge.setBrightness(input.value);
+      Promise.resolve(operation).catch(nativeError);
+    }, 80);
+  }
+
+  function wireHardwareSlider(label, kind) {
+    if (!label || label.dataset.aosHardwareControl) return;
+    var input = label.querySelector('input[type="range"]');
+    if (!input) return;
+    label.dataset.aosHardwareControl = kind;
+    input.min = kind === "brightness" ? "5" : "0";
+    input.max = "100";
+    input.addEventListener("input", function () { applyHardwareValue(kind, input); });
+  }
+
+  function ensureBrightnessSlider() {
+    var existing = document.querySelector('.quick label[data-aos-hardware-control="brightness"], .quick .aos-native-brightness');
+    if (existing) return existing;
+    var volume = Array.from(document.querySelectorAll(".quick label.slider")).find(function (label) {
+      var image = label.querySelector("img[alt]");
+      return image && image.alt.trim().toLowerCase() === "volume";
+    });
+    if (!volume || !volume.parentNode) return null;
+    var brightness = element("label", "slider aos-native-brightness");
+    brightness.title = "Screen brightness";
+    var input = document.createElement("input");
+    input.type = "range";
+    input.value = "100";
+    input.setAttribute("aria-label", "Screen brightness");
+    brightness.append(controlImage("Less.png", "Brightness"), input, controlImage("More.png", ""));
+    volume.insertAdjacentElement("afterend", brightness);
+    return brightness;
+  }
+
+  function updateHardwareSliders(state) {
+    var volume = Array.from(document.querySelectorAll(".quick label.slider")).find(function (label) {
+      var image = label.querySelector("img[alt]");
+      return image && image.alt.trim().toLowerCase() === "volume";
+    });
+    var brightness = ensureBrightnessSlider();
+    wireHardwareSlider(volume, "volume");
+    wireHardwareSlider(brightness, "brightness");
+    [[volume, state.volume, "Sound hardware is unavailable"], [brightness, state.brightness, "Hardware brightness is unavailable on this display"]].forEach(function (entry) {
+      var label = entry[0];
+      var value = entry[1];
+      if (!label) return;
+      var input = label.querySelector('input[type="range"]');
+      var available = Boolean(value && value.available);
+      input.disabled = !available;
+      label.classList.toggle("is-unavailable", !available);
+      label.title = available ? (label.dataset.aosHardwareControl === "volume" ? "Sound volume" : "Screen brightness") : entry[2];
+      if (available && document.activeElement !== input) input.value = String(value.percentage);
+    });
   }
 
   function wireQuickSettings() {
@@ -345,7 +414,7 @@
         openPanel(name === "Wi-Fi" ? "wifi" : "bluetooth");
       }, true);
     });
-    if (window.AOS_NATIVE_BRIDGE.state) updateQuickSettings(window.AOS_NATIVE_BRIDGE.state);
+    updateQuickSettings(window.AOS_NATIVE_BRIDGE.state || {});
   }
 
   function addSetupHardwareButton() {

@@ -579,6 +579,18 @@
   background: #e4f2fb;
 }
 
+.quick .slider.aos-native-brightness {
+  margin-top: 8px;
+}
+
+.quick .slider.is-unavailable {
+  opacity: 0.48;
+}
+
+.quick .slider input:disabled {
+  cursor: not-allowed;
+}
+
 @media (max-width: 760px) {
   .aos-installer {
     padding: 0;
