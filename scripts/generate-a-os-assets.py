@@ -395,19 +395,24 @@ def save_boot_gif() -> None:
 
 def save_boot_splash() -> None:
     width, height = 1152, 648
-    image = Image.new("RGB", (width, height), (2, 3, 5))
-    draw = ImageDraw.Draw(image, "RGBA")
-    tile = (width // 2 - 112, 112, width // 2 + 112, 336)
-    draw.rounded_rectangle(tile, radius=48, fill=(22, 126, 208, 255), outline=(102, 213, 239, 190), width=4)
-    logo(draw, (width // 2 - 68, 145, width // 2 + 68, 305), (255, 255, 255, 255))
-    title = "A-OS"
-    title_font = font(62, True)
-    title_box = draw.textbbox((0, 0), title, font=title_font)
-    draw.text(((width - (title_box[2] - title_box[0])) / 2, 382), title, font=title_font, fill=(255, 255, 255, 255))
-    subtitle = "Desktop"
-    subtitle_font = font(24, False)
-    subtitle_box = draw.textbbox((0, 0), subtitle, font=subtitle_font)
-    draw.text(((width - (subtitle_box[2] - subtitle_box[0])) / 2, 466), subtitle, font=subtitle_font, fill=(164, 194, 217, 255))
+    canonical = ICONS / "splash.png"
+    if canonical.exists():
+        with Image.open(canonical) as custom_splash:
+            image = custom_splash.convert("RGB").resize((width, height), Image.Resampling.LANCZOS)
+    else:
+        image = Image.new("RGB", (width, height), (2, 3, 5))
+        draw = ImageDraw.Draw(image, "RGBA")
+        tile = (width // 2 - 112, 112, width // 2 + 112, 336)
+        draw.rounded_rectangle(tile, radius=48, fill=(22, 126, 208, 255), outline=(102, 213, 239, 190), width=4)
+        logo(draw, (width // 2 - 68, 145, width // 2 + 68, 305), (255, 255, 255, 255))
+        title = "A-OS"
+        title_font = font(62, True)
+        title_box = draw.textbbox((0, 0), title, font=title_font)
+        draw.text(((width - (title_box[2] - title_box[0])) / 2, 382), title, font=title_font, fill=(255, 255, 255, 255))
+        subtitle = "Desktop"
+        subtitle_font = font(24, False)
+        subtitle_box = draw.textbbox((0, 0), subtitle, font=subtitle_font)
+        draw.text(((width - (subtitle_box[2] - subtitle_box[0])) / 2, 466), subtitle, font=subtitle_font, fill=(164, 194, 217, 255))
 
     destinations = [
         ICONS / "splash.png",
