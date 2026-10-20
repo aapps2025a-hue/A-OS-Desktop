@@ -191,7 +191,9 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
         partition = {"path": "/dev/nvme0n1p3", "partn": "3", "fstype": "ntfs"}
         end = 450 * SERVER.GIB
         geometry = {"number": 3, "start": SERVER.GIB, "end": end - 1, "size": end - SERVER.GIB}
-        region = {"startMiB": 417788, "endMiB": 450560, "size": 32772 * SERVER.MIB}
+        region = {"startMiB": 428028, "endMiB": 460800, "size": 32772 * SERVER.MIB}
+        resized = {**geometry, "end": region["startMiB"] * SERVER.MIB - 1,
+                   "size": region["startMiB"] * SERVER.MIB - geometry["start"]}
 
         def command_result(command, timeout=SERVER.COMMAND_TIMEOUT):
             if command[0] == "ntfsresize":
@@ -200,9 +202,9 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
 
         with patch.object(SERVER, "list_partitions", return_value=[partition]):
             with patch.object(SERVER, "mounted_path", return_value=""):
-                with patch.object(SERVER, "partition_geometry", return_value=geometry):
+                with patch.object(SERVER, "partition_geometry", side_effect=[geometry, resized]):
                     with patch.object(SERVER, "run", side_effect=command_result) as run_command:
-                        with patch.object(SERVER, "require_command", return_value="") as require:
+                        with patch.object(SERVER, "require_command", return_value="512") as require:
                             with patch.object(SERVER, "disk_free_regions", return_value=[region]):
                                 with patch.object(SERVER.time, "sleep"):
                                     prepared = SERVER.create_alongside_space(item)
@@ -211,8 +213,11 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
         self.assertEqual(prepared["endMiB"], region["endMiB"])
         self.assertFalse(prepared["autoCreateSpace"])
         self.assertEqual(run_command.call_args_list[0].args[0][0:3], ["ntfsresize", "--no-action", "--no-progress-bar"])
-        self.assertEqual(require.call_args_list[0].args[0][0:2], ["ntfsresize", "--force"])
-        self.assertIn("resizepart", require.call_args_list[1].args[0])
+        self.assertIn("--no-act", require.call_args_list[1].args[0])
+        self.assertEqual(require.call_args_list[2].args[0][0:2], ["ntfsresize", "--force"])
+        self.assertEqual(require.call_args_list[3].args[0][0], "sfdisk")
+        self.assertEqual(require.call_args_list[3].kwargs["input_text"],
+                         "size={}\n".format(resized["size"] // 512))
 
     def test_automatic_partition_creation_stops_when_ntfs_check_fails(self):
         item = {
@@ -226,10 +231,11 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
             with patch.object(SERVER, "mounted_path", return_value=""):
                 with patch.object(SERVER, "partition_geometry", return_value=geometry):
                     with patch.object(SERVER, "run", return_value=(1, "", "NTFS is hibernated")):
-                        with patch.object(SERVER, "require_command") as require:
+                        with patch.object(SERVER, "require_command", return_value="512") as require:
                             with self.assertRaisesRegex(RuntimeError, "safety check failed"):
                                 SERVER.create_alongside_space(item)
-        require.assert_not_called()
+        self.assertEqual(len(require.call_args_list), 2)
+        self.assertIn("--no-act", require.call_args_list[1].args[0])
 
     def test_legacy_boot_still_reports_windows_and_requests_uefi(self):
         device = {

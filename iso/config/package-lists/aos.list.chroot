@@ -12,6 +12,7 @@ curl
 ca-certificates
 parted
 gdisk
+fdisk
 grub-efi-amd64-bin
 efibootmgr
 dosfstools

@@ -59,19 +59,20 @@ def active_public_root():
     return PACKAGED_ROOT
 
 
-def run(command, timeout=COMMAND_TIMEOUT):
+def run(command, timeout=COMMAND_TIMEOUT, input_text=None):
     try:
         result = subprocess.run(
             command, check=False, capture_output=True, text=True, timeout=timeout,
             env={**os.environ, "LC_ALL": "C.UTF-8"},
+            input=input_text,
         )
         return result.returncode, result.stdout.strip(), result.stderr.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired) as error:
         return 127, "", str(error)
 
 
-def require_command(command, timeout=COMMAND_TIMEOUT):
-    code, output, error = run(command, timeout=timeout)
+def require_command(command, timeout=COMMAND_TIMEOUT, input_text=None):
+    code, output, error = run(command, timeout=timeout, input_text=input_text)
     if code != 0:
         raise RuntimeError(error or output or "Command failed: " + " ".join(command))
     return output
@@ -812,6 +813,13 @@ def create_alongside_space(item):
     new_filesystem_bytes = new_partition_bytes - NTFS_RESIZE_MARGIN_BYTES
     if new_filesystem_bytes < MIN_WINDOWS_REMAIN_BYTES:
         raise RuntimeError("The Windows partition is too small to create a 32 GB A-OS partition area")
+    sector_size = int(require_command(["blockdev", "--getss", device], timeout=10))
+    if sector_size not in (512, 4096) or new_partition_bytes % sector_size:
+        raise RuntimeError("Unsupported Windows partition sector alignment")
+    # -N changes only this entry; omitted fields retain their original values.
+    resize_input = "size={}\n".format(new_partition_bytes // sector_size)
+    resize_command = ["sfdisk", "--lock=yes", "--wipe", "never", "--wipe-partitions", "never", "-N", str(number), device]
+    require_command(resize_command + ["--no-act"], timeout=30, input_text=resize_input)
 
     check_command = ["ntfsresize", "--no-action", "--no-progress-bar", "--size", str(new_filesystem_bytes), partition]
     code, output, error = run(check_command, timeout=600)
@@ -830,13 +838,19 @@ def create_alongside_space(item):
     require_command([
         "ntfsresize", "--force", "--no-progress-bar", "--size", str(new_filesystem_bytes), partition,
     ], timeout=3600)
-    require_command([
-        "parted", "-s", device, "unit", "MiB", "resizepart", str(number), str(new_end_mib),
-    ], timeout=120)
+    require_command(resize_command, timeout=120, input_text=resize_input)
     require_command(["partprobe", device], timeout=30)
     run(["udevadm", "settle"], timeout=30)
     time.sleep(1)
-    regions = [region for region in disk_free_regions(device) if region["size"] >= MIN_ALONGSIDE_BYTES]
+    resized = partition_geometry(device, number)
+    if resized["start"] != geometry["start"] or resized["size"] != new_partition_bytes:
+        raise RuntimeError("The resized Windows partition did not match the planned geometry")
+    regions = []
+    for region in disk_free_regions(device):
+        end_mib = min(region["endMiB"], (geometry["end"] + 1) // MIB)
+        size = (end_mib - new_end_mib) * MIB
+        if region["startMiB"] == new_end_mib and size >= MIN_ALONGSIDE_BYTES:
+            regions.append({"startMiB": new_end_mib, "endMiB": end_mib, "size": size})
     if not regions:
         raise RuntimeError("Windows was resized, but A-OS could not find the new unallocated partition area")
     region = min(regions, key=lambda value: abs(int(value["startMiB"]) - new_end_mib))
