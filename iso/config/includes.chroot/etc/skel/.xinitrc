@@ -15,6 +15,19 @@ done
 echo "AOS_LOCAL_SERVER_READY"
 
 (
+  attempt=0
+  while [ "$attempt" -lt 30 ]; do
+    if curl --silent --fail --max-time 5 https://a-os-desktop.web.app/version.json >/dev/null; then
+      echo "AOS_NETWORK_ONLINE"
+      exit 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 2
+  done
+  echo "AOS_NETWORK_OFFLINE"
+) &
+
+(
   while [ ! -f /tmp/aos-browser-ready ]; do
     sleep 0.25
   done

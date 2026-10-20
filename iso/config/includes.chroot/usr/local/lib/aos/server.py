@@ -360,9 +360,22 @@ def alongside_targets(devices, source):
         esp = windows_esp_for_disk(device)
         if not esp:
             continue
-        for region in disk_free_regions(path):
-            if region["size"] < MIN_ALONGSIDE_BYTES:
-                continue
+        eligible_regions = [region for region in disk_free_regions(path) if region["size"] >= MIN_ALONGSIDE_BYTES]
+        if not eligible_regions:
+            targets.append({
+                "id": "alongside-unavailable:" + path,
+                "mode": "alongside",
+                "name": "Windows local disk (C:) - space required",
+                "description": "Create at least 32 GB of unallocated space in Windows Disk Management, then boot this USB again",
+                "size": 0,
+                "removable": False,
+                "installable": False,
+                "blockedReason": "At least 32 GB of unallocated space is required to keep Windows",
+                "disk": path,
+                "esp": esp,
+            })
+            continue
+        for region in eligible_regions:
             blocked_reason = "Disable Secure Boot in UEFI settings before installing" if secure_boot_enabled() else ""
             target_id = "alongside:{}:{}:{}".format(path, region["startMiB"], region["endMiB"])
             targets.append({

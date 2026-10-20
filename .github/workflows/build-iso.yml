@@ -80,9 +80,18 @@ jobs:
             -no-reboot &
           qemu_pid=$!
           trap 'kill "$qemu_pid" 2>/dev/null || true' EXIT
+          browser_ready=false
+          network_ready=false
           for attempt in $(seq 1 300); do
-            if grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-serial.log 2>/dev/null; then
-              echo "Chromium loaded and executed the packaged A-OS HTML after boot."
+            grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-serial.log 2>/dev/null && browser_ready=true
+            grep -q "AOS_NETWORK_ONLINE" /tmp/aos-serial.log 2>/dev/null && network_ready=true
+            if grep -q "AOS_NETWORK_OFFLINE" /tmp/aos-serial.log 2>/dev/null; then
+              cat /tmp/aos-serial.log
+              echo "A-OS booted, but the ISO could not reach the Internet." >&2
+              exit 1
+            fi
+            if [ "$browser_ready" = true ] && [ "$network_ready" = true ]; then
+              echo "Chromium executed A-OS HTML and the ISO reached the Internet after boot."
               exit 0
             fi
             if ! kill -0 "$qemu_pid" 2>/dev/null; then
@@ -180,9 +189,18 @@ jobs:
             -serial file:/tmp/aos-installed-serial.log \
             -no-reboot &
           qemu_pid=$!
+          browser_ready=false
+          network_ready=false
           for attempt in $(seq 1 300); do
-            if grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-installed-serial.log 2>/dev/null; then
-              echo "The installed UEFI layout loaded and executed the packaged A-OS HTML."
+            grep -q "AOS_BROWSER_HTML_READY" /tmp/aos-installed-serial.log 2>/dev/null && browser_ready=true
+            grep -q "AOS_NETWORK_ONLINE" /tmp/aos-installed-serial.log 2>/dev/null && network_ready=true
+            if grep -q "AOS_NETWORK_OFFLINE" /tmp/aos-installed-serial.log 2>/dev/null; then
+              cat /tmp/aos-installed-serial.log
+              echo "Installed A-OS booted, but it could not reach the Internet." >&2
+              exit 1
+            fi
+            if [ "$browser_ready" = true ] && [ "$network_ready" = true ]; then
+              echo "The installed UEFI layout executed A-OS HTML and reached the Internet."
               exit 0
             fi
             if ! kill -0 "$qemu_pid" 2>/dev/null; then

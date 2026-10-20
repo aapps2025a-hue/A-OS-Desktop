@@ -46,6 +46,23 @@ class InstallerSafetyTests(unittest.TestCase):
                 SERVER.validate_alongside_target("alongside:/dev/sda;reboot:1:2")
             targets.assert_not_called()
 
+    def test_windows_disk_without_space_is_reported_but_not_installable(self):
+        device = {
+            "type": "disk",
+            "rm": False,
+            "path": "/dev/nvme0n1",
+            "pttype": "gpt",
+            "children": [],
+        }
+        with patch.object(SERVER.Path, "is_dir", return_value=True):
+            with patch.object(SERVER, "windows_esp_for_disk", return_value="/dev/nvme0n1p1"):
+                with patch.object(SERVER, "disk_free_regions", return_value=[]):
+                    targets = SERVER.alongside_targets([device], "/dev/sdb")
+        self.assertEqual(len(targets), 1)
+        self.assertEqual(targets[0]["name"], "Windows local disk (C:) - space required")
+        self.assertFalse(targets[0]["installable"])
+        self.assertIn("32 GB", targets[0]["blockedReason"])
+
     def test_grub_menu_keeps_windows_and_aos(self):
         config = SERVER.grub_configuration("aos-system-uuid", "windows-esp-uuid")
         self.assertIn("menuentry 'A-OS Desktop'", config)
