@@ -418,17 +418,37 @@ def live_source_is_removable():
     return "1" in fields or "usb" in fields
 
 
-def block_devices():
-    code, output, _ = run([
-        "lsblk", "--json", "--bytes", "--output",
-        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTUUID,PARTN,PTTYPE",
-    ])
+def read_block_devices(columns, device=None):
+    # Bookworm's lsblk has no PARTN column. Read partition numbers from sysfs.
+    command = ["lsblk", "--json", "--bytes", "--tree", "--output", columns]
+    if device:
+        command.append(device)
+    code, output, error = run(command)
     if code != 0:
-        return []
+        raise RuntimeError("Disk detection failed: " + (error.strip() or output.strip() or "lsblk failed"))
     try:
-        return json.loads(output).get("blockdevices", [])
+        devices = json.loads(output)["blockdevices"]
+        if not isinstance(devices, list):
+            raise ValueError("Invalid block-device list")
     except (TypeError, ValueError):
-        return []
+        raise RuntimeError("Disk detection returned invalid data")
+    except KeyError:
+        raise RuntimeError("Disk detection returned no device list")
+
+    def add_partition_numbers(items):
+        for item in items:
+            if item.get("type") == "part":
+                item["partn"] = partition_number(item.get("path"))
+            add_partition_numbers(item.get("children") or [])
+
+    add_partition_numbers(devices)
+    return devices
+
+
+def block_devices():
+    return read_block_devices(
+        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTUUID,PTTYPE"
+    )
 
 
 def parse_parted_free(output):
@@ -477,7 +497,11 @@ def partition_has_path(partition, components):
     finally:
         if mount_dir:
             run(["umount", str(mount_dir)], timeout=10)
-            shutil.rmtree(mount_dir, ignore_errors=True)
+            # Never recursively remove a directory that could still be mounted.
+            try:
+                mount_dir.rmdir()
+            except OSError:
+                pass
 
 
 def partition_has_windows_loader(partition):
@@ -698,13 +722,10 @@ def bluetooth_scan():
 
 
 def list_partitions(device):
-    code, output, _ = run(["lsblk", "--json", "--bytes", "--output", "PATH,TYPE,START,SIZE,PARTN,FSTYPE", device])
-    if code != 0:
-        return []
-    try:
-        root = json.loads(output).get("blockdevices", [])[0]
-    except (TypeError, ValueError, IndexError):
-        return []
+    devices = read_block_devices("PATH,TYPE,START,SIZE,FSTYPE", device)
+    if not devices:
+        raise RuntimeError("The selected disk was not returned by lsblk: " + device)
+    root = devices[0]
     return [item for item in root.get("children") or [] if item.get("type") == "part"]
 
 
@@ -738,7 +759,15 @@ def validate_alongside_target(target):
     listed = {item["id"]: item for item in storage_targets()["targets"] if item.get("mode") == "alongside"}
     item = listed.get(target)
     if not item:
-        raise RuntimeError("That Windows unallocated region is no longer available")
+        disk = str(target).split(":")[1]
+        same_disk = [candidate for candidate in listed.values() if candidate.get("disk") == disk]
+        blocked = next((candidate.get("blockedReason") for candidate in same_disk if candidate.get("blockedReason")), "")
+        if blocked:
+            raise RuntimeError("Windows was detected, but installation is blocked: " + blocked)
+        raise RuntimeError(
+            "The selected Windows installation area could not be revalidated. "
+            "Go Back to disk selection and choose Rescan disks. No disk has been erased."
+        )
     if not item.get("installable"):
         raise RuntimeError(item.get("blockedReason") or "A-OS cannot use that Windows unallocated region")
     if not Path("/sys/firmware/efi").is_dir():
@@ -822,10 +851,14 @@ def create_alongside_space(item):
 
 
 def partition_number(partition):
-    output = require_command(["lsblk", "-dnro", "PARTN", partition], timeout=5)
-    if not output.strip().isdigit():
-        raise RuntimeError("A-OS could not identify a new partition")
-    return int(output.strip())
+    name = os.path.basename(os.path.realpath(str(partition or "")))
+    try:
+        number = (Path("/sys/class/block") / name / "partition").read_text().strip()
+    except OSError as error:
+        raise RuntimeError("Cannot read partition number for " + name) from error
+    if not number.isdigit() or int(number) < 1:
+        raise RuntimeError("Invalid partition number for " + name)
+    return int(number)
 
 
 def create_partition(device, name, start_mib, end_mib):
@@ -954,26 +987,25 @@ menuentry 'A-OS Desktop 3.0' {
 def install_alongside_worker(target):
     mount_root = None
     mounted = []
-    original_partition_numbers = set()
+    created_partition_numbers = []
     new_boot_entry = ""
     efi_directory = None
+    efi_created = False
     try:
         item = validate_alongside_target(target)
         device = item["disk"]
-        original_partition_numbers = {
-            int(partition.get("partn")) for partition in list_partitions(device)
-            if str(partition.get("partn") or "").isdigit()
-        }
         live_medium = Path("/run/live/medium")
         if not live_medium.is_dir() or not (live_medium / "live" / "filesystem.squashfs").is_file():
             raise RuntimeError("The A-OS installation media could not be found")
+        system_mib = max(4096, int(math.ceil(directory_size(live_medium) / MIB)) + 1024)
+        if item.get("autoCreateSpace") and MIN_ALONGSIDE_BYTES // MIB < system_mib + 8192:
+            raise RuntimeError("The A-OS image is too large for automatic partition creation")
         if item.get("autoCreateSpace"):
             set_job_state(
                 INSTALL_STATE, INSTALL_LOCK, stage="checking", progress=2,
                 message="Checking Windows before creating the A-OS partition area",
             )
             item = create_alongside_space(item)
-        system_mib = max(4096, int(math.ceil(directory_size(live_medium) / MIB)) + 1024)
         available_mib = int(item["endMiB"]) - int(item["startMiB"])
         if available_mib < system_mib + 8192:
             raise RuntimeError("A-OS needs at least 8 GB of data space after its system image")
@@ -986,9 +1018,11 @@ def install_alongside_worker(target):
         system_partition, system_number = create_partition(
             device, "AOS_SYSTEM", int(item["startMiB"]), system_end,
         )
+        created_partition_numbers.append(system_number)
         persistence_partition, persistence_number = create_partition(
             device, "AOS_DATA", system_end, int(item["endMiB"]),
         )
+        created_partition_numbers.append(persistence_number)
 
         set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="formatting", progress=15, message="Formatting new A-OS partitions")
         require_command(["mkfs.ext4", "-F", "-L", "AOS_SYSTEM", system_partition], timeout=180)
@@ -1035,6 +1069,7 @@ def install_alongside_worker(target):
         if efi_directory.exists():
             raise RuntimeError("An existing A-OS UEFI loader was found; remove the old A-OS installation first")
         efi_directory.mkdir(parents=True)
+        efi_created = True
         shutil.copyfile(
             "/usr/share/plymouth/themes/aos/aos-boot.png",
             efi_directory / "splash.png",
@@ -1073,23 +1108,21 @@ def install_alongside_worker(target):
             message="A-OS is installed beside Windows and set as the next boot. Remove the USB and restart; Windows remains in the A-OS boot menu.",
         )
     except Exception as error:
-        if efi_directory and efi_directory.exists():
+        if efi_created and efi_directory and efi_directory.exists():
             shutil.rmtree(efi_directory, ignore_errors=True)
+        unmounted = True
         for path in reversed(mounted):
-            run(["umount", str(path)], timeout=15)
+            code, _, _ = run(["umount", str(path)], timeout=15)
+            unmounted = unmounted and code == 0
         if new_boot_entry:
             run(["efibootmgr", "-b", new_boot_entry, "-B"], timeout=10)
-        if mount_root:
+        if mount_root and unmounted:
             shutil.rmtree(mount_root, ignore_errors=True)
-        if "item" in locals():
-            current_numbers = {
-                int(partition.get("partn")) for partition in list_partitions(item["disk"])
-                if str(partition.get("partn") or "").isdigit()
-            }
-            for number in sorted(current_numbers - original_partition_numbers, reverse=True):
+        if "item" in locals() and unmounted:
+            for number in reversed(created_partition_numbers):
                 run(["parted", "-s", item["disk"], "rm", str(number)], timeout=30)
             run(["partprobe", item["disk"]], timeout=20)
-        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="error", error=str(error), message="Installation stopped and new A-OS partitions were removed")
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="error", error=str(error), message="Installation stopped. Review the error before retrying; any completed Windows resize remains in effect.")
 
 
 def install_erase_worker(target):
@@ -1342,7 +1375,10 @@ class AosHandler(SimpleHTTPRequestHandler):
                 "/__aos/bluetooth/scan": bluetooth_scan,
             }
             if route in routes:
-                self._json(200, routes[route]())
+                try:
+                    self._json(200, routes[route]())
+                except RuntimeError as error:
+                    self._json(503, {"ok": False, "error": str(error)})
                 return
             if route == "/__aos/update":
                 self._json(200, {"packagedVersion": read_json_file(active_public_root() / "version.json"), "remoteVersion": remote_version(), "persistent": persistent_storage_active()})

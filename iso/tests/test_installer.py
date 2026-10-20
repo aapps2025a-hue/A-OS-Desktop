@@ -17,6 +17,41 @@ os.chdir(ORIGINAL_DIRECTORY)
 
 
 class InstallerSafetyTests(unittest.TestCase):
+    def test_disk_scan_does_not_request_unsupported_partn_column(self):
+        output = '{"blockdevices":[{"path":"/dev/nvme0n1","type":"disk","children":[{"path":"/dev/nvme0n1p3","type":"part"}]}]}'
+        with patch.object(SERVER, "run", return_value=(0, output, "")) as runner:
+            with patch.object(SERVER.Path, "read_text", return_value="3\n"):
+                devices = SERVER.block_devices()
+        command = runner.call_args.args[0]
+        self.assertNotIn("PARTN", command[command.index("--output") + 1].split(","))
+        self.assertIn("--tree", command)
+        self.assertEqual(devices[0]["children"][0]["partn"], 3)
+
+    def test_partition_listing_preserves_children_without_name_column(self):
+        output = '{"blockdevices":[{"path":"/dev/sda","type":"disk","children":[{"path":"/dev/sda1","type":"part"}]}]}'
+        with patch.object(SERVER, "run", return_value=(0, output, "")) as runner:
+            with patch.object(SERVER.Path, "read_text", return_value="1\n"):
+                partitions = SERVER.list_partitions("/dev/sda")
+        self.assertIn("--tree", runner.call_args.args[0])
+        self.assertEqual(partitions[0]["partn"], 1)
+
+    def test_disk_scan_reports_command_failure_not_missing_drive(self):
+        with patch.object(SERVER, "run", return_value=(1, "", "lsblk: failed to access sysfs")):
+            with self.assertRaisesRegex(RuntimeError, "Disk detection failed.*sysfs"):
+                SERVER.block_devices()
+
+    def test_disk_scan_rejects_invalid_json(self):
+        with patch.object(SERVER, "run", return_value=(0, "invalid", "")):
+            with self.assertRaisesRegex(RuntimeError, "invalid data"):
+                SERVER.block_devices()
+
+    def test_partition_number_reads_kernel_metadata(self):
+        with patch.object(SERVER.Path, "read_text", return_value="12\n"):
+            self.assertEqual(SERVER.partition_number("/dev/nvme0n1p12"), 12)
+        with patch.object(SERVER.Path, "read_text", return_value=""):
+            with self.assertRaisesRegex(RuntimeError, "Invalid partition number"):
+                SERVER.partition_number("/dev/nvme0n1p12")
+
     def tearDown(self):
         SERVER.invalidate_network_health()
 

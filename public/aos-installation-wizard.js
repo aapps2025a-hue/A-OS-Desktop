@@ -11,6 +11,7 @@
   var selectedTarget = "";
   var targets = [];
   var pollTimer = 0;
+  var storageError = "";
 
   function element(tag, className, text) {
     var node = document.createElement(tag);
@@ -110,6 +111,14 @@
     list.setAttribute("role", "radiogroup");
     targets.forEach(function (item) { list.appendChild(targetButton(item)); });
     main.appendChild(list);
+    if (storageError) main.appendChild(element("p", "aos-installer__error", storageError));
+    var rescan = element("button", "", "Rescan disks");
+    rescan.type = "button";
+    rescan.addEventListener("click", function () {
+      window.AOS_INSTALLATION_WIZARD.close();
+      show(true);
+    });
+    main.appendChild(rescan);
     actions(main, {label: "Next", disabled: !selected() || selected().installable === false, onClick: function () { step = 1; render(); }});
     return main;
   }
@@ -246,6 +255,7 @@
     if ((!force && !shouldShow()) || overlay || !document.body) return;
     step = 0;
     selectedTarget = "";
+    storageError = "";
     targets = [{id: "live", mode: "live", name: "Try A-OS from this USB", description: "Does not install A-OS and will not boot after the USB is removed", size: "Try only", removable: true, installable: true}];
     overlay = element("section", "aos-installer");
     overlay.id = "aos-installation-wizard";
@@ -274,7 +284,10 @@
         return Number(left.removable) - Number(right.removable);
       });
       render();
-    }).catch(function () {});
+    }).catch(function (error) {
+      storageError = error && error.message ? error.message : "Disk detection failed. Rescan disks to retry.";
+      if (overlay) render();
+    });
   }
 
   window.AOS_INSTALLATION_WIZARD = {
