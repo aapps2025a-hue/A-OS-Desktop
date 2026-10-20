@@ -35,7 +35,10 @@ def main():
             partition = loop + "p1"
             command("mkntfs", "--quick", "--force", partition)
             command("ntfscp", partition, str(marker), "/keep.txt")
+            command("udevadm", "trigger", "--action=change", "/sys/class/block/" + Path(partition).name)
+            command("udevadm", "settle")
             original = server.partition_geometry(loop, 1)
+            print("Detected test partitions:", server.list_partitions(loop), flush=True)
             assert server.list_partitions(loop)[0]["partn"] == 1
             prepared = server.create_alongside_space({
                 "disk": loop, "resizePartition": partition,
