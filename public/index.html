@@ -1,45 +1,45 @@
 <!doctype html>
-<html lang="en" data-aos-surface="desktop">
+<html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>A-OS Desktop 3.0</title>
-    <meta name="description" content="A-OS Web Operating System with A-Applications, original A-OS icons, and the A-OS Originals emoji pack." />
-    <link rel="icon" type="image/png" href="./assets/icons/OS Logo.png" />
-    <meta property="og:title" content="A-OS Desktop 3.0" />
-    <meta property="og:description" content="A-OS Web Operating System with A-Applications, original A-OS icons, and the A-OS Originals emoji pack." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <script src="./aos-classic-artwork.js?v=20261017-classic4"></script>
-    <script src="./aos-boot-sequence.js?v=20261019-stretch2"></script>
-    <script src="./aos-browser-compat.js?v=20261017-managed12"></script>
-    <script src="./aos-security-service.js?v=20261017-managed12"></script>
-    <script src="./aos-organization-accounts.js?v=20261017-managed12"></script>
-    <script src="./aos-taskbar-positions.js?v=20261017-managed12"></script>
-    <script src="./aos-window-options.js?v=20261017-managed12"></script>
-    <script src="./aos-nearby-share.js?v=20261017-managed12"></script>
-    <script src="./aos-3-runtime.js?v=20261020-aos3"></script>
-    <script src="./aos-session-persistence.js?v=20261019-persist2"></script>
-    <script src="./aos-device-status.js?v=20261018-native3"></script>
-    <script src="./aos-native-bridge.js?v=20261020-network1"></script>
-    <script type="module" crossorigin src="./aos-desktop-loader.js?v=20261019-installer1"></script>
-    <script src="./aos-live-iso-ready.js?v=20261017-classic1" defer></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-CEFUMHuR.css">
-    <link rel="stylesheet" href="./aos-managed10.css?v=20261019-home1">
-    <link rel="stylesheet" href="./aos-live-native.css?v=20261018-native3">
-    <link rel="stylesheet" href="./aos-store-platform.css?v=20261019-account1">
-    <link rel="stylesheet" href="./aos-3-runtime.css?v=20261020-aos3">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A-OS 3.0</title>
+    <meta name="description" content="Download the bootable A-OS Desktop 3.0 installer ISO and learn how it installs to a UEFI computer.">
+    <link rel="icon" href="./assets/icons/OS Logo.png" type="image/png">
+    <link rel="stylesheet" href="./download.css?v=20261020-aos3">
   </head>
   <body>
-    <div id="root"></div>
-    <script src="./aos-managed10-runtime.js?v=20261019-home1" defer></script>
-    <script src="./assets/emojis/aos-complete/catalog-data.js?v=20261017-managed12" defer></script>
-    <script src="./aos-complete-emoji-pack.js?v=20261017-managed12" defer></script>
-    <script src="./aos-installation-wizard.js?v=20261020-network1" defer></script>
-    <script src="./aos-live-native-runtime.js?v=20261020-network1" defer></script>
-    <script src="./vendor/html2canvas.min.js" defer></script>
-    <script src="https://a-ai.web.app/askembed-bridge.js" defer></script>
-    <script src="./aos-tv-screen.js" defer></script>
-    <script src="./aos-store-platform.js?v=20261019-account1" defer></script>
+    <nav>
+      <a class="brand" href="./"><img src="./assets/icons/OS Logo.png" alt=""><span>A-OS</span></a>
+      <div><a href="#install">Installation</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
+    </nav>
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p>A-OS Desktop</p>
+          <h1>A-OS 3.0</h1>
+          <span>A bootable desktop with persistent files, hardware controls, Family Device, A-Store and A-AI.</span>
+          <div class="actions">
+            <a class="primary" href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Desktop-amd64.iso">Download ISO</a>
+            <a href="/a-os.html">Try A-OS</a>
+          </div>
+          <small>64-bit Intel/AMD UEFI computers. Disable Secure Boot before installation.</small>
+        </div>
+      </section>
+      <section class="install" id="install">
+        <header><p>Install once</p><h2>Boot without the USB</h2></header>
+        <ol>
+          <li><b>Write the ISO</b><span>Use Rufus in GPT/UEFI mode. Copying the ISO as a normal file is not enough.</span></li>
+          <li><b>Boot the USB</b><span>Select the USB from the computer's UEFI boot menu.</span></li>
+          <li><b>Choose a disk</b><span>Install beside Windows in unallocated space, or erase a selected empty disk.</span></li>
+          <li><b>Finish installation</b><span>Wait for the completed message, remove the USB, and restart into A-OS.</span></li>
+        </ol>
+      </section>
+      <section class="details" id="about">
+        <img src="./assets/backgrounds/Family Home.png" alt="A colorful family home background in A-OS child mode">
+        <div><p>New in 3.0</p><h2>One device for the whole family</h2><span>Family Device adds protected adult controls, individual logins and a simpler icon-first layout for young children.</span><a href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/tag/iso-v3.0.0">Release details</a></div>
+      </section>
+    </main>
+    <footer><span>A-OS 3.0 open source desktop</span><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">GitHub</a></footer>
   </body>
 </html>

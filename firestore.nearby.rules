@@ -77,6 +77,24 @@ service cloud.firestore {
    }
   }
 
+  function accountBackupValid(uid) {
+   let d = request.resource.data;
+   return owner(uid)
+    && d.keys().hasOnly(['ownerUid','payload','updatedAt'])
+    && d.ownerUid == uid
+    && d.payload is string
+    && d.payload.size() > 1
+    && d.payload.size() < 800000
+    && d.updatedAt is int;
+  }
+
+  // Private A-OS Files and settings backup for the signed-in A-Applications user.
+  match /aosAccountBackups/{uid} {
+   allow read: if owner(uid);
+   allow create, update: if accountBackupValid(uid);
+   allow delete: if owner(uid);
+  }
+
   function storeEnvelopeValid(ownerUid) {
    let d = request.resource.data;
    return request.auth != null

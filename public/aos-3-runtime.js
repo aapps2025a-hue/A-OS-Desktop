@@ -54,14 +54,32 @@
   }
 
   function openNamedApp(name) {
-    var wanted = String(name).toLowerCase();
-    var candidates = Array.from(document.querySelectorAll("button,[role='button']"));
-    var target = candidates.find(function (button) {
-      var label = [button.getAttribute("aria-label"), button.title, button.textContent].filter(Boolean).join(" ").trim().toLowerCase();
-      return label === wanted || label.indexOf(wanted) !== -1;
-    });
+    var aliases = {web: "osinternet", photos: "mediaview", games: "minesweeper"};
+    var wanted = aliases[String(name).toLowerCase()] || String(name).toLowerCase();
+
+    function findButton() {
+      var candidates = Array.from(document.querySelectorAll("button,[role='button']")).filter(function (button) {
+        return !button.closest(".aos-child-launcher,.aos-child-games");
+      });
+      return candidates.find(function (button) {
+        var label = [button.getAttribute("aria-label"), button.title, button.textContent].filter(Boolean).join(" ").trim().toLowerCase();
+        return label === wanted || label.indexOf(wanted) !== -1;
+      });
+    }
+
+    var target = findButton();
     if (target) {
       target.click();
+      return true;
+    }
+
+    var launcherButton = document.querySelector(".launcher-button");
+    if (launcherButton) {
+      launcherButton.click();
+      window.setTimeout(function () {
+        var delayedTarget = findButton();
+        if (delayedTarget) delayedTarget.click();
+      }, 80);
       return true;
     }
     return false;
@@ -88,18 +106,110 @@
       var launcher = document.createElement("nav");
       launcher.className = "aos-child-launcher";
       launcher.setAttribute("aria-label", "Easy apps");
+      var member = activeMember();
+      launcher.innerHTML = '<header><img src="./assets/icons/Profile.png" alt=""><span><b>Hello, ' + escapeHtml(member && member.name || "there") + '</b><small>What would you like to do?</small></span></header><div class="aos-child-app-grid"></div>';
+      var grid = launcher.querySelector(".aos-child-app-grid");
       [
-        ["Paint", "Draw.png"], ["Web", "Browser.png"], ["A-Store", "Downloads.png"],
-        ["Games", "Lucky.png"], ["Photos", "Images.png"], ["Files", "Files.png"]
+        ["Paint", "Draw.png", "Paint"], ["Internet", "Browser.png", "OSInternet"], ["A-Store", "Downloads.png", "A-Store"],
+        ["Games", "Lucky.png", "games"], ["Photos", "Images.png", "MediaView"], ["My Files", "Files.png", "Files"]
       ].forEach(function (item) {
         var button = document.createElement("button");
         button.type = "button";
         button.innerHTML = '<b>' + escapeHtml(item[0]) + '</b><span><img src="./assets/icons/' + encodeURIComponent(item[1]) + '" alt=""></span>';
-        button.addEventListener("click", function () { openNamedApp(item[0]); });
-        launcher.appendChild(button);
+        button.addEventListener("click", function () {
+          if (item[2] === "games") openChildGames();
+          else openNamedApp(item[2]);
+        });
+        grid.appendChild(button);
       });
       desktop.appendChild(launcher);
     });
+  }
+
+  function closeChildGames() {
+    document.getElementById("aos-child-games")?.remove();
+  }
+
+  function showTicTacToe(stage) {
+    var cells = Array(9).fill("");
+    var turn = "X";
+    var finished = false;
+    var wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+    function render(message) {
+      stage.innerHTML = '<section class="aos-child-game-board"><h2>Tic-tac-toe</h2><p>' + escapeHtml(message || turn + " goes next") + '</p><div class="aos-child-tic-grid"></div><button type="button" data-game-reset>New game</button></section>';
+      var grid = stage.querySelector(".aos-child-tic-grid");
+      cells.forEach(function (value, index) {
+        var button = document.createElement("button");
+        button.type = "button";
+        button.textContent = value;
+        button.setAttribute("aria-label", value ? "Square " + (index + 1) + ": " + value : "Empty square " + (index + 1));
+        button.addEventListener("click", function () {
+          if (finished || cells[index]) return;
+          cells[index] = turn;
+          var won = wins.some(function (line) { return line.every(function (cell) { return cells[cell] === turn; }); });
+          if (won) { finished = true; render(turn + " wins!"); return; }
+          if (cells.every(Boolean)) { finished = true; render("It is a draw."); return; }
+          turn = turn === "X" ? "O" : "X";
+          render();
+        });
+        grid.appendChild(button);
+      });
+      stage.querySelector("[data-game-reset]").addEventListener("click", function () { showTicTacToe(stage); });
+    }
+    render();
+  }
+
+  function showMemoryGame(stage) {
+    var values = ["A", "A", "O", "O", "S", "S", "3", "3"].sort(function () { return Math.random() - 0.5; });
+    var open = [];
+    var matched = new Set();
+    var locked = false;
+
+    function render() {
+      stage.innerHTML = '<section class="aos-child-game-board"><h2>Memory match</h2><p>Find all four matching pairs.</p><div class="aos-child-memory-grid"></div><button type="button" data-game-reset>Shuffle cards</button></section>';
+      var grid = stage.querySelector(".aos-child-memory-grid");
+      values.forEach(function (value, index) {
+        var button = document.createElement("button");
+        var revealed = open.indexOf(index) !== -1 || matched.has(index);
+        button.type = "button";
+        button.textContent = revealed ? value : "?";
+        button.className = matched.has(index) ? "matched" : "";
+        button.addEventListener("click", function () {
+          if (locked || revealed || open.length === 2) return;
+          open.push(index);
+          render();
+          if (open.length === 2) {
+            locked = true;
+            window.setTimeout(function () {
+              if (values[open[0]] === values[open[1]]) { matched.add(open[0]); matched.add(open[1]); }
+              open = [];
+              locked = false;
+              render();
+            }, 650);
+          }
+        });
+        grid.appendChild(button);
+      });
+      stage.querySelector("p").textContent = matched.size === values.length ? "You found every pair!" : "Find all four matching pairs.";
+      stage.querySelector("[data-game-reset]").addEventListener("click", function () { showMemoryGame(stage); });
+    }
+    render();
+  }
+
+  function openChildGames() {
+    closeChildGames();
+    var overlay = document.createElement("section");
+    overlay.id = "aos-child-games";
+    overlay.className = "aos-child-games";
+    overlay.innerHTML = '<header><img src="./assets/icons/Lucky.png" alt=""><span><b>Games</b><small>Choose a game to play</small></span><button type="button" data-games-close aria-label="Close games">&times;</button></header>' +
+      '<main><nav><button type="button" data-game="tic"><img src="./assets/icons/Lucky.png" alt=""><b>Tic-tac-toe</b><small>Take turns with X and O</small></button><button type="button" data-game="memory"><img src="./assets/icons/STAR.png" alt=""><b>Memory match</b><small>Find the matching cards</small></button><button type="button" data-game="mines"><img src="./assets/icons/Bug.png" alt=""><b>Minesweeper</b><small>Find the safe squares</small></button></nav><div class="aos-child-game-stage"><section class="aos-child-game-welcome"><img src="./assets/icons/Lucky.png" alt=""><h1>Pick a game</h1><p>Games stay inside A-OS and can be closed at any time.</p></section></div></main>';
+    document.body.appendChild(overlay);
+    var stage = overlay.querySelector(".aos-child-game-stage");
+    overlay.querySelector("[data-games-close]").addEventListener("click", closeChildGames);
+    overlay.querySelector('[data-game="tic"]').addEventListener("click", function () { showTicTacToe(stage); });
+    overlay.querySelector('[data-game="memory"]').addEventListener("click", function () { showMemoryGame(stage); });
+    overlay.querySelector('[data-game="mines"]').addEventListener("click", function () { closeChildGames(); openNamedApp("Minesweeper"); });
   }
 
   function familyCode(value) {

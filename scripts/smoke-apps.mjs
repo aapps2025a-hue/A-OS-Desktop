@@ -176,6 +176,42 @@ async function main() {
   await evaluate(`document.querySelector("#aos-family-app [data-family-close]").click()`);
   await waitFor(`!document.querySelector("#aos-family-app")`, "the Family Device app to close");
 
+  const syncResponse = await evaluate(`fetch("/api/a-applications-sync").then(async (response) => ({
+    status: response.status,
+    contentType: response.headers.get("content-type") || "",
+    body: await response.text()
+  }))`);
+  if (syncResponse.status !== 401 || !syncResponse.contentType.includes("application/json") || !syncResponse.body.trim().startsWith("{")) {
+    throw new Error(`Account restore did not return a JSON response: ${JSON.stringify(syncResponse)}`);
+  }
+
+  await evaluate(`
+    localStorage.setItem("aos-family-active-member", JSON.stringify({id:"smoke-child",name:"Alex",ageGroup:"7-",signedInAt:Date.now()}));
+    location.reload();
+  `);
+  const childDesktopDeadline = Date.now() + 30000;
+  while (Date.now() < childDesktopDeadline && !(await evaluate(`Boolean(document.querySelector(".aos-child-launcher"))`))) {
+    await evaluate(`(() => {
+      const input = document.querySelector('input[type="password"]');
+      if (input) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+        setter.call(input, "AosTest123!");
+        input.dispatchEvent(new Event("input", {bubbles:true}));
+        input.dispatchEvent(new Event("change", {bubbles:true}));
+      }
+      const button = [...document.querySelectorAll("button")].find((item) => ["Continue", "Unlock", "Sign in"].includes(item.textContent.trim()));
+      if (button) button.click();
+    })()`);
+    await sleep(250);
+  }
+  await waitFor(`Boolean(document.querySelector(".aos-child-launcher .aos-child-app-grid"))`, "the simplified child launcher", 30000);
+  await evaluate(`[...document.querySelectorAll(".aos-child-app-grid button")].find((button) => button.textContent.includes("Paint")).click()`);
+  await waitFor(`Boolean(document.querySelector(".paint-app canvas"))`, "Paint to open from the child launcher");
+  await evaluate(`[...document.querySelectorAll(".aos-child-app-grid button")].find((button) => button.textContent.includes("Games")).click()`);
+  await waitFor(`Boolean(document.querySelector("#aos-child-games"))`, "the child Games screen");
+  await evaluate(`document.querySelector('#aos-child-games [data-game="tic"]').click()`);
+  await waitFor(`document.querySelectorAll(".aos-child-tic-grid button").length === 9`, "the tic-tac-toe game board");
+
   const visibleArea = await evaluate("document.body.getBoundingClientRect().width > 900 && document.body.getBoundingClientRect().height > 500");
   if (!visibleArea) throw new Error("A-OS rendered an empty or undersized page");
   console.log(`A-OS app smoke test passed: ${requiredApps.join(", ")}`);
