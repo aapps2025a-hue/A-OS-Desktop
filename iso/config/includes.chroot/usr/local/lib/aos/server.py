@@ -10,6 +10,7 @@ import math
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tarfile
 import tempfile
@@ -29,6 +30,8 @@ COMMAND_TIMEOUT = 12
 VERSION_CACHE_SECONDS = 30
 VERSION_CACHE = {"at": 0.0, "value": None}
 VERSION_LOCK = Lock()
+NETWORK_HEALTH_CACHE = {"at": 0.0, "value": None}
+NETWORK_HEALTH_LOCK = Lock()
 UPDATE_LOCK = Lock()
 INSTALL_LOCK = Lock()
 UPDATE_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
@@ -149,6 +152,47 @@ def networking_enabled():
     return code == 0 and output.strip().lower() == "enabled"
 
 
+def invalidate_network_health():
+    with NETWORK_HEALTH_LOCK:
+        NETWORK_HEALTH_CACHE["at"] = 0.0
+        NETWORK_HEALTH_CACHE["value"] = None
+
+
+def network_health(force=False):
+    now = time.monotonic()
+    with NETWORK_HEALTH_LOCK:
+        cached = NETWORK_HEALTH_CACHE.get("value")
+        if not force and cached is not None and now - NETWORK_HEALTH_CACHE["at"] < 15:
+            return dict(cached)
+
+    result = {
+        "online": False,
+        "dns": False,
+        "checked": True,
+        "message": "Internet access is off",
+    }
+    if networking_enabled():
+        result["message"] = "Connected to a network, checking Internet access"
+        try:
+            socket.getaddrinfo("a-os-desktop.web.app", 443, type=socket.SOCK_STREAM)
+            result["dns"] = True
+        except OSError:
+            result["message"] = "Connected, but DNS is not responding"
+        if result["dns"]:
+            try:
+                request = Request(REMOTE_VERSION_URL, method="HEAD", headers={"User-Agent": "A-OS/1.2.1"})
+                with urlopen(request, timeout=5) as response:
+                    result["online"] = 200 <= int(response.status) < 500
+                result["message"] = "Internet connection is working" if result["online"] else "The Internet check was rejected"
+            except Exception:
+                result["message"] = "Connected, but the Internet is not responding"
+
+    with NETWORK_HEALTH_LOCK:
+        NETWORK_HEALTH_CACHE["at"] = time.monotonic()
+        NETWORK_HEALTH_CACHE["value"] = dict(result)
+    return result
+
+
 def current_network():
     if not networking_enabled():
         return "Internet off"
@@ -200,6 +244,7 @@ def system_state():
         "native": True,
         "persistent": persistent_storage_active(),
         "networking": {"enabled": networking_enabled()},
+        "connectivity": network_health(),
         "battery": battery_state(),
         "wifi": {"enabled": wifi_enabled(), "network": current_network()},
         "bluetooth": {"enabled": bluetooth_enabled()},
@@ -323,8 +368,8 @@ def alongside_targets(devices, source):
             targets.append({
                 "id": target_id,
                 "mode": "alongside",
-                "name": "Install alongside Windows",
-                "description": "Uses only unallocated space on {} | Windows detected{}".format(
+                "name": "Windows local disk (C:) - install A-OS beside Windows",
+                "description": "Uses only unallocated space on {} | Windows local disk detected{}".format(
                     path, " | " + blocked_reason if blocked_reason else "",
                 ),
                 "size": region["size"],
@@ -900,6 +945,7 @@ class AosHandler(SimpleHTTPRequestHandler):
             routes = {
                 "/__aos/system": system_state,
                 "/__aos/storage": storage_targets,
+                "/__aos/network/check": lambda: network_health(force=True),
                 "/__aos/wifi/scan": wifi_scan,
                 "/__aos/bluetooth/scan": bluetooth_scan,
             }
@@ -942,6 +988,7 @@ class AosHandler(SimpleHTTPRequestHandler):
         if route == "/__aos/networking/toggle":
             enabled = bool(body.get("enabled"))
             code, _, error = run(["nmcli", "networking", "on" if enabled else "off"])
+            invalidate_network_health()
             self._json(200 if code == 0 else 500, {"ok": code == 0, "enabled": enabled, "error": error})
             return
         if route == "/__aos/wifi/toggle":
@@ -949,6 +996,7 @@ class AosHandler(SimpleHTTPRequestHandler):
             if enabled and not networking_enabled():
                 run(["nmcli", "networking", "on"])
             code, _, error = run(["nmcli", "radio", "wifi", "on" if enabled else "off"])
+            invalidate_network_health()
             self._json(200 if code == 0 else 500, {"ok": code == 0, "enabled": enabled, "error": error})
             return
         if route == "/__aos/wifi/connect":
@@ -962,7 +1010,9 @@ class AosHandler(SimpleHTTPRequestHandler):
             if password:
                 command.extend(["password", password])
             code, output, error = run(command, timeout=35)
-            self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error})
+            invalidate_network_health()
+            health = network_health(force=True) if code == 0 else None
+            self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error, "connectivity": health})
             return
         if route == "/__aos/bluetooth/toggle":
             enabled = bool(body.get("enabled"))

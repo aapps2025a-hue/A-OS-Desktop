@@ -393,6 +393,32 @@ def save_boot_gif() -> None:
     frames[0].save(path, save_all=True, append_images=frames[1:], duration=60, disposal=2, optimize=True)
 
 
+def save_boot_splash() -> None:
+    width, height = 1152, 648
+    image = Image.new("RGB", (width, height), (2, 3, 5))
+    draw = ImageDraw.Draw(image, "RGBA")
+    tile = (width // 2 - 112, 112, width // 2 + 112, 336)
+    draw.rounded_rectangle(tile, radius=48, fill=(22, 126, 208, 255), outline=(102, 213, 239, 190), width=4)
+    logo(draw, (width // 2 - 68, 145, width // 2 + 68, 305), (255, 255, 255, 255))
+    title = "A-OS"
+    title_font = font(62, True)
+    title_box = draw.textbbox((0, 0), title, font=title_font)
+    draw.text(((width - (title_box[2] - title_box[0])) / 2, 382), title, font=title_font, fill=(255, 255, 255, 255))
+    subtitle = "Desktop"
+    subtitle_font = font(24, False)
+    subtitle_box = draw.textbbox((0, 0), subtitle, font=subtitle_font)
+    draw.text(((width - (subtitle_box[2] - subtitle_box[0])) / 2, 466), subtitle, font=subtitle_font, fill=(164, 194, 217, 255))
+
+    destinations = [
+        ICONS / "splash.png",
+        ROOT / "iso" / "config" / "includes.chroot" / "usr" / "share" / "plymouth" / "themes" / "aos" / "aos-boot.png",
+        ROOT / "iso" / "config" / "bootloaders" / "grub-pc" / "splash.png",
+    ]
+    for destination in destinations:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        image.save(destination, optimize=True)
+
+
 for icon_name in ICON_NAMES:
     save_icon(icon_name)
 
@@ -407,5 +433,6 @@ if legacy_sound.exists() and not (MEDIA / legacy_sound.name).exists():
     shutil.copy2(legacy_sound, MEDIA / legacy_sound.name)
 
 save_boot_gif()
+save_boot_splash()
 
 print(f"icons={len(list(ICONS.iterdir()))} backgrounds={len(list(BACKGROUNDS.iterdir()))} media={len(list(MEDIA.iterdir()))}")

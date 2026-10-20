@@ -187,7 +187,18 @@
       isInternet ? null : function () { loadDevices(body, isWifi); }
     ));
     if (isInternet) {
-      body.appendChild(element("p", "aos-native-empty", enabled ? "Internet access is enabled for Ethernet, Wi-Fi, A-OS apps, and embedded websites." : "Internet access is off. Local A-OS files and settings still work."));
+      var connectivity = state.connectivity || {};
+      body.appendChild(element("p", "aos-native-empty", enabled ? (connectivity.message || "Internet access is enabled for Ethernet, Wi-Fi, A-OS apps, and embedded websites.") : "Internet access is off. Local A-OS files and settings still work."));
+      if (enabled) {
+        var check = element("button", "primary", "Check connection");
+        check.type = "button";
+        check.addEventListener("click", function () {
+          check.disabled = true;
+          check.textContent = "Checking";
+          window.aosNetworkBridge.check().then(renderPanel).catch(nativeError);
+        });
+        body.appendChild(check);
+      }
     } else {
       loadDevices(body, isWifi);
     }
@@ -310,7 +321,7 @@
       var detail = button.querySelector("small");
       if (!label || !detail) return;
       if (label.textContent.trim() === "Wi-Fi" && state.wifi) {
-        detail.textContent = state.wifi.enabled ? (state.wifi.network || "Available") : "Off";
+        detail.textContent = state.wifi.enabled ? (state.connectivity && state.connectivity.checked && !state.connectivity.online ? "No Internet" : (state.wifi.network || "Available")) : "Off";
         button.classList.toggle("on", Boolean(state.wifi.enabled));
       }
       if (label.textContent.trim() === "Bluetooth" && state.bluetooth) {

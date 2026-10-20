@@ -2,7 +2,7 @@ import importlib.util
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import call, patch
+from unittest.mock import MagicMock, call, patch
 
 
 REPOSITORY = Path(__file__).resolve().parents[2]
@@ -16,6 +16,9 @@ os.chdir(ORIGINAL_DIRECTORY)
 
 
 class InstallerSafetyTests(unittest.TestCase):
+    def tearDown(self):
+        SERVER.invalidate_network_health()
+
     def test_parted_free_regions_are_aligned_inward(self):
         output = """BYT;
 /dev/nvme0n1:256060514304B:nvme:512:512:gpt:Example:;
@@ -90,6 +93,25 @@ Boot0007* A-OS
                 with self.assertRaisesRegex(RuntimeError, "boot order"):
                     SERVER.prioritize_aos_boot("0007")
         command.assert_not_called()
+
+    def test_network_health_reports_disabled_networking(self):
+        with patch.object(SERVER, "networking_enabled", return_value=False):
+            health = SERVER.network_health(force=True)
+        self.assertFalse(health["online"])
+        self.assertFalse(health["dns"])
+        self.assertEqual(health["message"], "Internet access is off")
+
+    def test_network_health_checks_dns_and_https(self):
+        response = MagicMock()
+        response.status = 200
+        response.__enter__.return_value = response
+        with patch.object(SERVER, "networking_enabled", return_value=True):
+            with patch.object(SERVER.socket, "getaddrinfo", return_value=[("", "", "", "", "")]):
+                with patch.object(SERVER, "urlopen", return_value=response):
+                    health = SERVER.network_health(force=True)
+        self.assertTrue(health["online"])
+        self.assertTrue(health["dns"])
+        self.assertEqual(health["message"], "Internet connection is working")
 
 
 if __name__ == "__main__":

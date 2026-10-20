@@ -1,0 +1,13 @@
+[Unit]
+Description=Prepare networking for A-OS
+After=NetworkManager.service
+Wants=NetworkManager.service
+Before=aos-web.service aos-session.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/aos/network-ready.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

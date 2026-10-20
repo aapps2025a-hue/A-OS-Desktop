@@ -103,7 +103,7 @@
   }
 
   function renderStorage() {
-    var main = mainShell("Where to install A\u2011OS", "Choose the live session, install beside Windows in unallocated space, or dedicate an entire drive to A-OS.");
+    var main = mainShell("Where to install A\u2011OS", "Choose the Windows local disk (C:) option to keep Windows and install persistent A-OS in unallocated space, or choose a different empty drive.");
     var list = element("div", "aos-installer__targets");
     list.setAttribute("role", "radiogroup");
     targets.forEach(function (item) { list.appendChild(targetButton(item)); });
@@ -115,7 +115,8 @@
   function renderNetwork() {
     var state = window.AOS_NATIVE_BRIDGE.state || {};
     var network = state.wifi && state.wifi.network;
-    var main = mainShell("Connect this device", network && network !== "Offline" ? "Connected to " + network + ". You can continue or choose another network." : "Connect now, or continue and connect later from Device controls.");
+    var online = state.connectivity && state.connectivity.online;
+    var main = mainShell("Connect this device", online ? "Internet connection is working" + (network && network !== "Offline" ? " through " + network : "") + "." : network && network !== "Offline" ? "Connected to " + network + ", but Internet access has not been confirmed yet." : "Connect now, or continue and connect later from Device controls.");
     var card = element("div", "aos-installer__targets");
     var button = element("button", "aos-installer__target");
     button.type = "button";
@@ -200,7 +201,7 @@
     var isLive = target && target.id === "live";
     var isAlongside = target && target.mode === "alongside";
     var lead = isLive ? "A-OS will run from the installation media. Changes are not guaranteed to survive a restart." : isAlongside ? "A-OS will use only the selected Windows unallocated space and create persistent storage for accounts, settings, apps, and files." : "A-OS will copy the bootable system and create persistent storage for accounts, settings, apps, and files.";
-    var main = mainShell(isLive ? "Start A-OS without installing" : isAlongside ? "Install beside Windows" : "Ready to install A\u2011OS", lead);
+    var main = mainShell(isLive ? "Start A-OS without installing" : isAlongside ? "Install A-OS on the Windows local disk" : "Ready to install A\u2011OS", lead);
     var summary = element("div", "aos-installer__targets");
     summary.appendChild(targetButton(target));
     main.appendChild(summary);

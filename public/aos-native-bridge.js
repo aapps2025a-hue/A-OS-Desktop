@@ -151,6 +151,9 @@
     },
     toggleInternet: function (enabled) {
       return post("/__aos/networking/toggle", {enabled: Boolean(enabled)}).then(refreshSystem);
+    },
+    check: function () {
+      return request("/__aos/network/check").then(refreshSystem);
     }
   };
 
