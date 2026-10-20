@@ -116,6 +116,15 @@ async function main() {
     localStorage.setItem("aos-no-locking", "true");
     localStorage.setItem("aos-profile", "Person");
     localStorage.setItem("aos-username", "ISO App Test");
+    localStorage.setItem("aos-files", JSON.stringify([{
+      id: "smoke-iso",
+      name: "A-OS Desktop.iso",
+      type: "file",
+      parent: "root",
+      content: "",
+      icon: "Downloads.png",
+      mime: "application/x-iso9660-image"
+    }]));
     location.reload();
   `);
   const desktopDeadline = Date.now() + 50000;
@@ -163,6 +172,11 @@ async function main() {
     await evaluate(`${appButton(label)}.click()`);
     await waitFor(`${appButton(label)}.classList.contains("state-open")`, `${label} to open`);
   }
+
+  await waitFor(
+    `[...document.querySelectorAll('img')].some((image) => decodeURIComponent(image.src).endsWith('/assets/icons/ISO.png'))`,
+    "the custom ISO file icon"
+  );
 
   await evaluate(`${appButton("Settings")}.click()`);
   await waitFor(`[...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Appearance")`, "Appearance settings");

@@ -39,6 +39,7 @@ ICON_NAMES = [
     "Shutdown.png", "splash.png", "STAR.png", "Success.png", "Terminal.png",
     "terminalcmd.png", "Text Editor.png", "This PC.png", "Tick.png", "Trash.png",
     "Unnamed app.png", "UnSafe.png", "Video.png", "Weather.png", "zip.png",
+    "ISO.png",
     "tma.png",
 ]
 
