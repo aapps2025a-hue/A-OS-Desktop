@@ -164,6 +164,18 @@ async function main() {
     throw new Error(`Restored wallpaper resolver returned unexpected paths: ${wallpaperPaths.join(", ")}`);
   }
 
+  await waitFor(
+    `Boolean(window.AOS_FAMILY_DEVICE && typeof window.AOS_FAMILY_DEVICE.open === "function")`,
+    "the A-OS 3.0 Family Device runtime"
+  );
+  await evaluate("window.AOS_FAMILY_DEVICE.open()");
+  await waitFor(
+    `Boolean(document.querySelector("#aos-family-app") && document.querySelector("#aos-family-app").textContent.includes("Family Device"))`,
+    "the Family Device app"
+  );
+  await evaluate(`document.querySelector("#aos-family-app [data-family-close]").click()`);
+  await waitFor(`!document.querySelector("#aos-family-app")`, "the Family Device app to close");
+
   const visibleArea = await evaluate("document.body.getBoundingClientRect().width > 900 && document.body.getBoundingClientRect().height > 500");
   if (!visibleArea) throw new Error("A-OS rendered an empty or undersized page");
   console.log(`A-OS app smoke test passed: ${requiredApps.join(", ")}`);

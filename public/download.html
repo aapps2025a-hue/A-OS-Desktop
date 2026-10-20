@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download A-OS 3.0</title>
+    <meta name="description" content="Download the bootable A-OS Desktop 3.0 installer ISO and learn how it installs to a UEFI computer.">
+    <link rel="icon" href="./assets/icons/OS Logo.png" type="image/png">
+    <link rel="stylesheet" href="./download.css?v=20261020-aos3">
+  </head>
+  <body>
+    <nav>
+      <a class="brand" href="./"><img src="./assets/icons/OS Logo.png" alt=""><span>A-OS</span></a>
+      <div><a href="#install">Installation</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
+    </nav>
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p>A-OS Desktop</p>
+          <h1>A-OS 3.0</h1>
+          <span>A bootable desktop with persistent files, hardware controls, Family Device, A-Store and A-AI.</span>
+          <div class="actions">
+            <a class="primary" href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Desktop-amd64.iso">Download ISO</a>
+            <a href="./">Try A-OS</a>
+          </div>
+          <small>64-bit Intel/AMD UEFI computers. Disable Secure Boot before installation.</small>
+        </div>
+      </section>
+      <section class="install" id="install">
+        <header><p>Install once</p><h2>Boot without the USB</h2></header>
+        <ol>
+          <li><b>Write the ISO</b><span>Use Rufus in GPT/UEFI mode. Copying the ISO as a normal file is not enough.</span></li>
+          <li><b>Boot the USB</b><span>Select the USB from the computer's UEFI boot menu.</span></li>
+          <li><b>Choose a disk</b><span>Install beside Windows in unallocated space, or erase a selected empty disk.</span></li>
+          <li><b>Finish installation</b><span>Wait for the completed message, remove the USB, and restart into A-OS.</span></li>
+        </ol>
+      </section>
+      <section class="details" id="about">
+        <img src="./assets/backgrounds/Family Home.png" alt="A colorful family home background in A-OS child mode">
+        <div><p>New in 3.0</p><h2>One device for the whole family</h2><span>Family Device adds protected adult controls, individual logins and a simpler icon-first layout for young children.</span><a href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/tag/iso-v3.0.0">Release details</a></div>
+      </section>
+    </main>
+    <footer><span>A-OS 3.0 open source desktop</span><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">GitHub</a></footer>
+  </body>
+</html>

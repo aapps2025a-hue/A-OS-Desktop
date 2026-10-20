@@ -1,7 +1,7 @@
-PRETTY_NAME="A-OS Desktop 1.2.1"
+PRETTY_NAME="A-OS Desktop 3.0"
 NAME="A-OS Desktop"
-VERSION_ID="1.2.1"
-VERSION="1.2.1"
+VERSION_ID="3.0.0"
+VERSION="3.0"
 ID=a-os
 ID_LIKE=debian
 HOME_URL="https://a-os-desktop.web.app/"

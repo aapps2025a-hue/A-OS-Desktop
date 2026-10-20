@@ -73,6 +73,23 @@ class InstallerSafetyTests(unittest.TestCase):
         self.assertIn("menuentry 'Windows Boot Manager'", config)
         self.assertIn("/EFI/Microsoft/Boot/bootmgfw.efi", config)
 
+    def test_standalone_grub_uses_aos_3_system_uuid_only(self):
+        config = SERVER.standalone_grub_configuration("aos-system-uuid")
+        self.assertIn("menuentry 'A-OS Desktop 3.0'", config)
+        self.assertIn("live-media=/dev/disk/by-uuid/aos-system-uuid", config)
+        self.assertIn("($aosroot)/live/vmlinuz", config)
+        self.assertNotIn("Windows Boot Manager", config)
+
+    def test_live_usb_is_detected_as_installation_media(self):
+        with patch.object(SERVER, "live_source_device", return_value="/dev/sdb"):
+            with patch.object(SERVER, "run", return_value=(0, "1 usb\n", "")):
+                self.assertTrue(SERVER.live_source_is_removable())
+
+    def test_internal_source_is_not_detected_as_installation_media(self):
+        with patch.object(SERVER, "live_source_device", return_value="/dev/nvme0n1"):
+            with patch.object(SERVER, "run", return_value=(0, "0 nvme\n", "")):
+                self.assertFalse(SERVER.live_source_is_removable())
+
     def test_efi_boot_order_parser(self):
         output = """BootCurrent: 0004
 BootNext: 0007

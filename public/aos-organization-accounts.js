@@ -237,8 +237,10 @@
     window.dispatchEvent(new CustomEvent("aos-organization-change", {detail: {mode: getMode(), active: getActiveAccount()}}));
   }
 
-  async function signIn(identifier, password, status) {
-    if (getMode() === "personal") throw new Error("Choose Business, Education, or Company mode in Settings first.");
+  async function signIn(identifier, password, status, options) {
+    if (getMode() === "personal" && !(options && options.allowPersonal)) {
+      throw new Error("Choose Business, Education, or Company mode in Settings first.");
+    }
     if (status) status.textContent = "Signing in securely...";
     await saveCurrentWorkspace();
     var session = await authenticate(identifier, password);

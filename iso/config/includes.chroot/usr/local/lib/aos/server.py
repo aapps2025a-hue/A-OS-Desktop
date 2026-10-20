@@ -25,7 +25,7 @@ READY_FILE = Path(os.environ.get("AOS_READY_FILE", "/tmp/aos-browser-ready"))
 PORT = int(os.environ.get("AOS_PORT", "5000"))
 REMOTE_VERSION_URL = "https://a-os-desktop.web.app/version.json"
 SOURCE_ARCHIVE_URL = "https://github.com/aapps2025a-hue/A-OS-Desktop/archive/{revision}.tar.gz"
-MAX_BODY = 16 * 1024
+MAX_BODY = 256 * 1024
 COMMAND_TIMEOUT = 12
 VERSION_CACHE_SECONDS = 30
 VERSION_CACHE = {"at": 0.0, "value": None}
@@ -96,7 +96,7 @@ def remote_version(force=False):
             return VERSION_CACHE["value"]
         value = None
         try:
-            request = Request(REMOTE_VERSION_URL, headers={"User-Agent": "A-OS-Desktop/1.2.1"})
+            request = Request(REMOTE_VERSION_URL, headers={"User-Agent": "A-OS-Desktop/3.0"})
             with urlopen(request, timeout=8) as response:
                 value = json.loads(response.read(64 * 1024).decode("utf-8"))
         except Exception:
@@ -128,6 +128,57 @@ def battery_state():
         except (OSError, ValueError):
             continue
     return {"available": False, "percentage": 0, "charging": False, "status": "unknown"}
+
+
+def device_info():
+    hostname = socket.gethostname() or "A-OS Device"
+    processor = "Unknown processor"
+    try:
+        for line in Path("/proc/cpuinfo").read_text(encoding="utf-8", errors="ignore").splitlines():
+            if line.lower().startswith("model name") and ":" in line:
+                processor = line.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    address = "Unavailable"
+    code, output, _ = run(["ip", "route", "get", "1.1.1.1"], timeout=3)
+    if code == 0:
+        match = re.search(r"\bsrc\s+(\d{1,3}(?:\.\d{1,3}){3})", output)
+        if match:
+            address = match.group(1)
+    release = read_json_file(active_public_root() / "version.json") or {}
+    return {
+        "ok": True,
+        "ip": address,
+        "device": hostname,
+        "processor": processor,
+        "os": "A-OS Desktop " + str(release.get("version") or "3.0"),
+    }
+
+
+def run_python(code):
+    source = str(code or "")
+    if not source.strip():
+        raise RuntimeError("The Python file is empty")
+    if len(source.encode("utf-8")) > MAX_BODY - 1024:
+        raise RuntimeError("The Python file is too large")
+    descriptor, path = tempfile.mkstemp(prefix="aos-python-", suffix=".py")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(source)
+        os.chmod(path, 0o644)
+        code_value, output, error = run(["runuser", "-u", "aos", "--", "python3", "-I", path], timeout=20)
+        return {
+            "ok": code_value == 0,
+            "exitCode": code_value,
+            "output": output[-65536:],
+            "error": error[-65536:],
+        }
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
 
 
 def split_nmcli(line):
@@ -180,7 +231,7 @@ def network_health(force=False):
             result["message"] = "Connected, but DNS is not responding"
         if result["dns"]:
             try:
-                request = Request(REMOTE_VERSION_URL, method="HEAD", headers={"User-Agent": "A-OS/1.2.1"})
+                request = Request(REMOTE_VERSION_URL, method="HEAD", headers={"User-Agent": "A-OS/3.0"})
                 with urlopen(request, timeout=5) as response:
                     result["online"] = 200 <= int(response.status) < 500
                 result["message"] = "Internet connection is working" if result["online"] else "The Internet check was rejected"
@@ -243,6 +294,10 @@ def system_state():
     return {
         "native": True,
         "persistent": persistent_storage_active(),
+        "installationMedia": {
+            "source": live_source_device(),
+            "removable": live_source_is_removable(),
+        },
         "networking": {"enabled": networking_enabled()},
         "connectivity": network_health(),
         "battery": battery_state(),
@@ -262,6 +317,17 @@ def live_source_device():
         return source
     code, parent, _ = run(["lsblk", "-dnro", "PKNAME", source], timeout=3)
     return "/dev/" + parent.strip() if code == 0 and parent.strip() else source
+
+
+def live_source_is_removable():
+    source = live_source_device()
+    if not source:
+        return False
+    code, output, _ = run(["lsblk", "-dnro", "RM,TRAN", source], timeout=3)
+    if code != 0:
+        return False
+    fields = output.lower().split()
+    return "1" in fields or "usb" in fields
 
 
 def block_devices():
@@ -453,8 +519,12 @@ def wifi_scan():
 
 def bluetooth_scan():
     run(["rfkill", "unblock", "bluetooth"])
+    run(["systemctl", "start", "bluetooth"], timeout=10)
     run(["bluetoothctl", "power", "on"])
-    run(["bluetoothctl", "--timeout", "5", "scan", "on"], timeout=8)
+    run(["bluetoothctl", "agent", "on"])
+    run(["bluetoothctl", "default-agent"])
+    run(["bluetoothctl", "pairable", "on"])
+    run(["bluetoothctl", "--timeout", "8", "scan", "on"], timeout=12)
     code, output, error = run(["bluetoothctl", "devices"])
     if code != 0:
         return {"ok": False, "error": error or "Bluetooth scan failed", "devices": []}
@@ -631,6 +701,24 @@ menuentry 'Windows Boot Manager' {
 """ % (esp_uuid, system_uuid, system_uuid)
 
 
+def standalone_grub_configuration(system_uuid):
+    return """set timeout=2
+set default=0
+if loadfont unicode; then
+    insmod gfxterm
+    insmod png
+    insmod efi_gop
+    terminal_output gfxterm
+fi
+
+menuentry 'A-OS Desktop 3.0' {
+    search --no-floppy --fs-uuid --set=aosroot %s
+    linux ($aosroot)/live/vmlinuz boot=live components persistence live-media=/dev/disk/by-uuid/%s live-media-path=/live quiet splash reboot=efi loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8 noeject
+    initrd ($aosroot)/live/initrd.img
+}
+""" % (system_uuid, system_uuid)
+
+
 def install_alongside_worker(target):
     mount_root = None
     mounted = []
@@ -767,60 +855,112 @@ def install_alongside_worker(target):
 
 
 def install_erase_worker(target):
-    mount_dir = None
+    mount_root = None
+    mounted = []
+    new_boot_entry = ""
     try:
         target, item = validate_install_target(target)
-        source = live_source_device()
-        if not source:
+        live_medium = Path("/run/live/medium")
+        if not live_medium.is_dir() or not (live_medium / "live" / "filesystem.squashfs").is_file():
             raise RuntimeError("The A-OS installation media could not be found")
-        image_bytes = iso_size(source)
-        if item["size"] < image_bytes + 2 * 1024 * 1024 * 1024:
-            raise RuntimeError("The selected drive needs at least 2 GB free after the A-OS image")
-        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="copying", progress=8, message="Copying A-OS to " + target)
+        system_mib = max(4096, int(math.ceil(directory_size(live_medium) / MIB)) + 1024)
+        disk_mib = int(item["size"]) // MIB
+        system_end = 513 + system_mib
+        if disk_mib < system_end + 8192:
+            raise RuntimeError("The selected drive needs at least 8 GB of data space after the A-OS system")
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="partitioning", progress=5, message="Creating a bootable A-OS disk layout")
         for partition in list_partitions(target):
             path = str(partition.get("path") or "")
             if path:
                 run(["swapoff", path], timeout=5)
                 run(["umount", path], timeout=10)
-        require_command(["dd", "if=" + source, "of=" + target, "bs=4M", "iflag=count_bytes", "count=" + str(image_bytes), "conv=fsync", "status=none"], timeout=3600)
-        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="storage", progress=68, message="Creating persistent A-OS storage")
-        code, table_type, _ = run(["lsblk", "-dnro", "PTTYPE", target], timeout=5)
-        if code == 0 and table_type.strip().lower() == "gpt":
-            run(["sgdisk", "-e", target], timeout=20)
-        run(["partprobe", target], timeout=20)
-        time.sleep(2)
-        partitions = list_partitions(target)
-        furthest_byte = image_bytes
-        for partition in partitions:
-            furthest_byte = max(furthest_byte, int(partition.get("start") or 0) + int(partition.get("size") or 0))
-        start_mib = int(math.ceil((furthest_byte + 16 * 1024 * 1024) / (1024 * 1024)))
-        if start_mib * 1024 * 1024 >= item["size"] - 1024 * 1024 * 1024:
-            raise RuntimeError("There is not enough room for persistent A-OS storage")
-        before = {str(partition.get("path") or "") for partition in partitions}
-        require_command(["parted", "-s", target, "unit", "MiB", "mkpart", "primary", "ext4", str(start_mib), "100%"], timeout=30)
+        require_command(["wipefs", "--all", target], timeout=30)
+        run(["sgdisk", "--zap-all", target], timeout=30)
+        require_command(["parted", "-s", target, "mklabel", "gpt"], timeout=30)
+        require_command(["parted", "-s", target, "unit", "MiB", "mkpart", "AOS_EFI", "fat32", "1", "513"], timeout=30)
+        require_command(["parted", "-s", target, "set", "1", "esp", "on"], timeout=30)
+        require_command(["parted", "-s", target, "unit", "MiB", "mkpart", "AOS_SYSTEM", "ext4", "513", str(system_end)], timeout=30)
+        require_command(["parted", "-s", target, "unit", "MiB", "mkpart", "AOS_DATA", "ext4", str(system_end), "100%"], timeout=30)
         require_command(["partprobe", target], timeout=20)
         run(["udevadm", "settle"], timeout=20)
-        time.sleep(2)
-        after = list_partitions(target)
-        candidates = [partition for partition in after if str(partition.get("path") or "") not in before]
-        if not candidates:
-            candidates = [partition for partition in after if int(partition.get("start") or 0) >= start_mib * 1024 * 1024]
-        if not candidates:
-            raise RuntimeError("A-OS could not create its persistent storage partition")
-        persistence = str(max(candidates, key=lambda value: int(value.get("start") or 0)).get("path") or "")
-        require_command(["mkfs.ext4", "-F", "-L", "persistence", persistence], timeout=180)
-        mount_dir = Path(tempfile.mkdtemp(prefix="aos-install-", dir="/mnt"))
-        require_command(["mount", persistence, str(mount_dir)], timeout=20)
-        (mount_dir / "persistence.conf").write_text("/ union\n", encoding="utf-8")
+        time.sleep(1)
+        partitions = {int(value.get("partn")): str(value.get("path") or "") for value in list_partitions(target) if str(value.get("partn") or "").isdigit()}
+        if not all(partitions.get(number) for number in (1, 2, 3)):
+            raise RuntimeError("A-OS could not find the partitions it created")
+        efi_partition, system_partition, persistence_partition = partitions[1], partitions[2], partitions[3]
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="formatting", progress=13, message="Formatting A-OS system and data partitions")
+        require_command(["mkfs.vfat", "-F", "32", "-n", "AOS_EFI", efi_partition], timeout=180)
+        require_command(["mkfs.ext4", "-F", "-L", "AOS_SYSTEM", system_partition], timeout=180)
+        require_command(["mkfs.ext4", "-F", "-L", "persistence", persistence_partition], timeout=180)
+
+        mount_root = Path(tempfile.mkdtemp(prefix="aos-install-", dir="/mnt"))
+        system_mount = mount_root / "system"
+        persistence_mount = mount_root / "data"
+        esp_mount = mount_root / "efi"
+        system_mount.mkdir()
+        persistence_mount.mkdir()
+        esp_mount.mkdir()
+        require_command(["mount", system_partition, str(system_mount)], timeout=20)
+        mounted.append(system_mount)
+        require_command(["mount", persistence_partition, str(persistence_mount)], timeout=20)
+        mounted.append(persistence_mount)
+        require_command(["mount", efi_partition, str(esp_mount)], timeout=20)
+        mounted.append(esp_mount)
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="copying", progress=23, message="Copying A-OS system files to the selected disk")
+        require_command(["rsync", "-aH", "--delete", "--exclude=lost+found", str(live_medium) + "/", str(system_mount) + "/"], timeout=3600)
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="verifying", progress=62, message="Verifying the installed A-OS system")
+        for relative in ("live/filesystem.squashfs", "live/vmlinuz", "live/initrd.img"):
+            source_file = live_medium / relative
+            installed_file = system_mount / relative
+            if not installed_file.is_file() or sha256_prefix(source_file, source_file.stat().st_size) != sha256_prefix(installed_file, installed_file.stat().st_size):
+                raise RuntimeError("The installed A-OS system did not match the USB files")
+        (persistence_mount / "persistence.conf").write_text("/ union\n", encoding="utf-8")
+
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, stage="bootloader", progress=79, message="Installing the A-OS UEFI bootloader")
+        efi_directory = esp_mount / "EFI" / "AOSDesktop"
+        fallback_directory = esp_mount / "EFI" / "BOOT"
+        efi_directory.mkdir(parents=True, exist_ok=True)
+        fallback_directory.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile("/usr/share/plymouth/themes/aos/aos-boot.png", efi_directory / "splash.png")
+        grub_file = mount_root / "grub.cfg"
+        grub_file.write_text(standalone_grub_configuration(filesystem_uuid(system_partition)), encoding="utf-8")
+        require_command([
+            "grub-mkstandalone", "--format=x86_64-efi", "--output=" + str(efi_directory / "grubx64.efi"),
+            "--locales=", "--fonts=unicode", "--modules=part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid gfxterm png efi_gop",
+            "boot/grub/grub.cfg=" + str(grub_file),
+        ], timeout=180)
+        shutil.copyfile(efi_directory / "grubx64.efi", fallback_directory / "BOOTX64.EFI")
+        (esp_mount / "startup.nsh").write_text("fs0:\\EFI\\AOSDesktop\\grubx64.efi\r\n", encoding="ascii")
+
+        if Path("/sys/firmware/efi").is_dir():
+            previous_entries = aos_boot_entries()
+            code, _, _ = run(["efibootmgr", "--create", "--disk", target, "--part", "1", "--label", "A-OS", "--loader", "\\EFI\\AOSDesktop\\grubx64.efi"], timeout=30)
+            if code == 0:
+                added_entries = aos_boot_entries() - previous_entries
+                new_boot_entry = sorted(added_entries)[-1] if added_entries else ""
+                if new_boot_entry:
+                    try:
+                        prioritize_aos_boot(new_boot_entry)
+                    except RuntimeError:
+                        pass
+
         require_command(["sync"], timeout=60)
-        require_command(["umount", str(mount_dir)], timeout=30)
-        mount_dir.rmdir()
-        mount_dir = None
-        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100, message="A-OS is installed. Remove the USB or DVD and restart.")
+        for path in reversed(mounted):
+            require_command(["umount", str(path)], timeout=30)
+        mounted.clear()
+        shutil.rmtree(mount_root, ignore_errors=True)
+        mount_root = None
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100, message="A-OS 3.0 is installed with a universal UEFI fallback loader. Remove the USB and restart.")
     except Exception as error:
-        if mount_dir:
-            run(["umount", str(mount_dir)], timeout=15)
-            shutil.rmtree(mount_dir, ignore_errors=True)
+        for path in reversed(mounted):
+            run(["umount", str(path)], timeout=15)
+        if new_boot_entry:
+            run(["efibootmgr", "-b", new_boot_entry, "-B"], timeout=10)
+        if mount_root:
+            shutil.rmtree(mount_root, ignore_errors=True)
         set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="error", error=str(error), message="Installation stopped")
 
 
@@ -869,7 +1009,7 @@ def update_worker(version):
         RELEASES_ROOT.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix="update-", dir=str(STATE_ROOT)))
         archive_path = work / "update.tar.gz"
-        request = Request(SOURCE_ARCHIVE_URL.format(revision=revision), headers={"User-Agent": "A-OS-Updater/1.2.1"})
+        request = Request(SOURCE_ARCHIVE_URL.format(revision=revision), headers={"User-Agent": "A-OS-Updater/3.0"})
         with urlopen(request, timeout=30) as response, archive_path.open("wb") as handle:
             total, received = int(response.headers.get("Content-Length") or 0), 0
             while True:
@@ -957,6 +1097,7 @@ class AosHandler(SimpleHTTPRequestHandler):
                 return
             routes = {
                 "/__aos/system": system_state,
+                "/__aos/info": device_info,
                 "/__aos/storage": storage_targets,
                 "/__aos/network/check": lambda: network_health(force=True),
                 "/__aos/wifi/scan": wifi_scan,
@@ -1030,18 +1171,38 @@ class AosHandler(SimpleHTTPRequestHandler):
         if route == "/__aos/bluetooth/toggle":
             enabled = bool(body.get("enabled"))
             if enabled:
+                run(["systemctl", "start", "bluetooth"], timeout=15)
                 run(["rfkill", "unblock", "bluetooth"])
+                run(["bluetoothctl", "agent", "on"])
+                run(["bluetoothctl", "default-agent"])
             code, _, error = run(["bluetoothctl", "power", "on" if enabled else "off"])
+            if enabled and code == 0:
+                run(["bluetoothctl", "pairable", "on"])
             self._json(200 if code == 0 else 500, {"ok": code == 0, "enabled": enabled, "error": error})
+            return
+        if route == "/__aos/python/run":
+            try:
+                result = run_python(body.get("code"))
+                self._json(200 if result["ok"] else 400, result)
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
             return
         if route == "/__aos/bluetooth/connect":
             address = str(body.get("address") or "").upper()
             if not re.fullmatch(r"[0-9A-F]{2}(?::[0-9A-F]{2}){5}", address):
                 self._json(400, {"ok": False, "error": "Invalid Bluetooth device"})
                 return
+            run(["systemctl", "start", "bluetooth"], timeout=15)
+            run(["rfkill", "unblock", "bluetooth"])
+            run(["bluetoothctl", "power", "on"])
             run(["bluetoothctl", "agent", "on"])
             run(["bluetoothctl", "default-agent"])
-            run(["bluetoothctl", "pair", address], timeout=25)
+            info_code, info_output, _ = run(["bluetoothctl", "info", address], timeout=10)
+            if info_code != 0 or "Paired: yes" not in info_output:
+                pair_code, pair_output, pair_error = run(["bluetoothctl", "pair", address], timeout=40)
+                if pair_code != 0:
+                    self._json(400, {"ok": False, "message": pair_output, "error": pair_error or "Bluetooth pairing failed"})
+                    return
             run(["bluetoothctl", "trust", address])
             code, output, error = run(["bluetoothctl", "connect", address], timeout=25)
             self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error})

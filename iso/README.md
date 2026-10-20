@@ -61,4 +61,4 @@ workflow runs the installer unit tests, builds it in a clean runner, boots it
 in QEMU from both the ISO and a generated installed UEFI disk until the real
 packaged HTML reports ready, and launches the core A-OS apps in headless Chrome.
 Only then does it publish a checksum and upload the ISO to the
-`iso-v1.2.1-classic1` release.
+`iso-v3.0.0` release.

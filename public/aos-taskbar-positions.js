@@ -101,7 +101,7 @@
     return '<div class="aos-os-center-runtime">' +
       '<header class="aos-os-center-hero"><img src="/assets/icons/OS Logo.png" alt=""><div><small>A-OS SYSTEM</small><h1>A-OS Operating System Center</h1><p>Manage this A-OS installation, verify protection, and open system services.</p></div></header>' +
       '<main class="aos-os-center-main">' +
-        '<section class="aos-os-center-status"><article class="aos-os-center-card"><span>OPERATIONAL</span><b>System status</b><p>A-OS Desktop is running normally.</p></article><article class="aos-os-center-card"><span>ACTIVE</span><b>Security service</b><p>Real-time scanning is enabled.</p></article><article class="aos-os-center-card"><span>CURRENT</span><b>Release channel</b><p>A-OS v1.2.1 stable.</p></article></section>' +
+        '<section class="aos-os-center-status"><article class="aos-os-center-card"><span>OPERATIONAL</span><b>System status</b><p>A-OS Desktop is running normally.</p></article><article class="aos-os-center-card"><span>ACTIVE</span><b>Security service</b><p>Real-time scanning is enabled.</p></article><article class="aos-os-center-card"><span>CURRENT</span><b>Release channel</b><p>A-OS 3.0 stable.</p></article></section>' +
         '<section class="aos-os-center-section"><small>DEVICE ACTIONS</small><h2>System tools</h2><div class="aos-os-center-actions"><button type="button" data-os-center-action="updates">Check for updates</button><button type="button" class="secondary" data-os-center-action="files">Open Files</button><a class="secondary" href="https://a-os-tv.web.app" target="_blank" rel="noopener">Open A-OS TV</a></div><p class="aos-os-center-result" data-os-center-result>OS Center is ready.</p></section>' +
         '<section class="aos-os-center-section"><small>ABOUT THIS DEVICE</small><h2>Complete A-OS environment</h2><p>A-OS Files, Security, A-Store, OSInternet, desktop apps, profiles, and device settings are available from this installation.</p></section>' +
       '</main></div>';
@@ -167,7 +167,7 @@
       document.title = "A-OS is hibernating";
       screen.querySelector("button").addEventListener("click", function () {
         localStorage.removeItem(POWER_STATE_KEY);
-        document.title = "A-OS Desktop v1.2.1";
+        document.title = "A-OS Desktop 3.0";
         screen.remove();
       });
       return;

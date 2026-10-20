@@ -104,7 +104,7 @@ jobs:
           echo "Chromium did not load the packaged A-OS HTML within ten minutes." >&2
           exit 1
 
-      - name: Boot-test the dual-boot disk layout in UEFI
+      - name: Boot-test the installed full-disk layout in UEFI
         run: |
           set -euo pipefail
           disk=/tmp/aos-installed.raw
@@ -120,12 +120,12 @@ jobs:
             if [ -n "$loop_device" ]; then sudo losetup -d "$loop_device" 2>/dev/null || true; fi
           }
           trap cleanup EXIT
-          truncate -s 8G "$disk"
+          truncate -s 16G "$disk"
           parted -s "$disk" mklabel gpt
           parted -s "$disk" unit MiB mkpart EFI fat32 1 513
           parted -s "$disk" set 1 esp on
-          parted -s "$disk" unit MiB mkpart AOS_SYSTEM ext4 513 4609
-          parted -s "$disk" unit MiB mkpart AOS_DATA ext4 4609 100%
+          parted -s "$disk" unit MiB mkpart AOS_SYSTEM ext4 513 6657
+          parted -s "$disk" unit MiB mkpart AOS_DATA ext4 6657 100%
           loop_device=$(sudo losetup --find --show --partscan "$disk")
           sudo mkfs.vfat -F 32 -n AOS_EFI "${loop_device}p1"
           sudo mkfs.ext4 -F -L AOS_SYSTEM "${loop_device}p2"
@@ -138,30 +138,31 @@ jobs:
           sudo rsync -aH --delete "$iso_mount/" "$system_mount/"
           echo '/ union' | sudo tee "$data_mount/persistence.conf" >/dev/null
           system_uuid=$(sudo blkid -s UUID -o value "${loop_device}p2")
-          esp_uuid=$(sudo blkid -s UUID -o value "${loop_device}p1")
-          python3 - "$system_uuid" "$esp_uuid" "$PWD" > /tmp/aos-installed-grub.cfg <<'PY'
+          python3 - "$system_uuid" "$PWD" > /tmp/aos-installed-grub.cfg <<'PY'
           import importlib.util
           import os
           from pathlib import Path
           import sys
 
-          repository = Path(sys.argv[3])
+          repository = Path(sys.argv[2])
           os.environ["AOS_PUBLIC_ROOT"] = str(repository / "public")
           server_path = repository / "iso/config/includes.chroot/usr/local/lib/aos/server.py"
           spec = importlib.util.spec_from_file_location("aos_server", server_path)
           server = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(server)
-          print(server.grub_configuration(sys.argv[1], sys.argv[2]), end="")
+          print(server.standalone_grub_configuration(sys.argv[1]), end="")
           PY
           sudo mkdir -p "$efi_mount/EFI/BOOT" "$efi_mount/EFI/AOSDesktop"
           sudo cp iso/config/includes.chroot/usr/share/plymouth/themes/aos/aos-boot.png "$efi_mount/EFI/AOSDesktop/splash.png"
           sudo grub-mkstandalone \
             --format=x86_64-efi \
-            --output="$efi_mount/EFI/BOOT/BOOTX64.EFI" \
+            --output="$efi_mount/EFI/AOSDesktop/grubx64.efi" \
             --locales= \
             --fonts=unicode \
-            --modules="part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid chain gfxterm png efi_gop" \
+            --modules="part_gpt fat ext2 iso9660 loopback linux normal search search_fs_uuid gfxterm png efi_gop" \
             "boot/grub/grub.cfg=/tmp/aos-installed-grub.cfg"
+          sudo cp "$efi_mount/EFI/AOSDesktop/grubx64.efi" "$efi_mount/EFI/BOOT/BOOTX64.EFI"
+          printf 'fs0:\\EFI\\AOSDesktop\\grubx64.efi\r\n' | sudo tee "$efi_mount/startup.nsh" >/dev/null
           sudo sync
           sudo umount "$efi_mount" "$data_mount" "$system_mount" "$iso_mount"
           sudo losetup -d "$loop_device"
@@ -229,14 +230,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view iso-v1.2.1-classic1 >/dev/null 2>&1; then
-            gh release create iso-v1.2.1-classic1 \
-              --title "A-OS Desktop hardware-enabled bootable ISO"
+          if ! gh release view iso-v3.0.0 >/dev/null 2>&1; then
+            gh release create iso-v3.0.0 \
+              --title "A-OS Desktop 3.0 bootable installer"
           fi
-          gh release edit iso-v1.2.1-classic1 \
-            --title "A-OS Desktop hardware-enabled bootable ISO" \
-            --notes "Bootable Debian Live image with the classic A-OS artwork, original icons, quiet automatic startup, real NetworkManager Wi-Fi, BlueZ Bluetooth, native battery status, and a conservative UEFI install-alongside-Windows mode that uses only pre-existing unallocated space. Publication requires both the ISO and the installed UEFI disk layout to boot in QEMU until the packaged A-OS HTML executes."
-          gh release upload iso-v1.2.1-classic1 \
+          gh release edit iso-v3.0.0 \
+            --title "A-OS Desktop 3.0 bootable installer" \
+            --notes "A-OS Desktop 3.0 boots the packaged A-OS HTML, supports a full-disk UEFI installation with a universal fallback loader, keeps persistent files and settings, and includes NetworkManager Wi-Fi, improved BlueZ Bluetooth, Family Device, Python execution, and the A-OS command line. Publication requires both the USB image and a no-USB installed UEFI disk to boot in QEMU until A-OS HTML executes."
+          gh release upload iso-v3.0.0 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
             --clobber

@@ -3,7 +3,7 @@
 
   if (!window.AOS_NATIVE_BRIDGE || window.AOS_INSTALLATION_WIZARD) return;
 
-  var COMPLETE_KEY = "aos-native-installation-complete-v4";
+  var COMPLETE_KEY = "aos-native-installation-complete-v5";
   var TARGET_KEY = "aos-native-installation-target";
   var baseUrl = new URL("./", document.currentScript ? document.currentScript.src : window.location.href);
   var overlay = null;
@@ -22,7 +22,9 @@
   function shouldShow() {
     var force = new URLSearchParams(window.location.search).get("aosInstall") === "1";
     if (force) return true;
-    if (window.AOS_NATIVE_BRIDGE.state && window.AOS_NATIVE_BRIDGE.state.persistent) {
+    var state = window.AOS_NATIVE_BRIDGE.state || {};
+    if (state.installationMedia && state.installationMedia.removable) return true;
+    if (state.persistent) {
       try { localStorage.setItem(COMPLETE_KEY, "1"); } catch (_) {}
       return false;
     }
@@ -47,7 +49,7 @@
 
   function renderSteps(sidebar) {
     sidebar.innerHTML = "";
-    sidebar.appendChild(element("h2", "", "Install A-OS"));
+    sidebar.appendChild(element("h2", "", "Install A-OS 3.0"));
     ["Where to install", "Connect this device", "Install and start"].forEach(function (label, index) {
       var item = element("div", "aos-installer__step" + (index === step ? " is-current" : "") + (index < step ? " is-complete" : ""));
       item.append(element("span", "", index < step ? "\u2713" : String(index + 1)), element("b", "", label));
@@ -103,7 +105,7 @@
   }
 
   function renderStorage() {
-    var main = mainShell("Where to install A\u2011OS", "Choose the Windows local disk (C:) option to keep Windows and install persistent A-OS in unallocated space, or choose a different empty drive.");
+    var main = mainShell("Where to install A\u2011OS 3.0", "Choose the Windows local disk (C:) option to keep Windows, or choose an empty drive for a complete A-OS installation. The USB try option does not install A-OS.");
     var list = element("div", "aos-installer__targets");
     list.setAttribute("role", "radiogroup");
     targets.forEach(function (item) { list.appendChild(targetButton(item)); });
@@ -159,7 +161,9 @@
         bar.style.width = Math.max(0, Math.min(100, Number(state.progress || 0))) + "%";
         message.textContent = state.error || state.message || "Installing A-OS...";
         if (state.stage === "complete") {
-          var note = element("p", "aos-installer__warning", "Installation is complete. Remove the installation USB, then restart. The installed A-OS is now the next boot target; Windows remains available from the A-OS boot menu when installed alongside Windows.");
+          var installedTarget = selected();
+          var noteText = installedTarget && installedTarget.mode === "alongside" ? "Installation is complete. Remove the installation USB, then restart. A-OS is the next boot target and Windows remains available from the A-OS boot menu." : "Installation is complete. Remove the installation USB, then restart. A-OS will boot from the selected internal disk using its universal UEFI loader.";
+          var note = element("p", "aos-installer__warning", noteText);
           var restart = element("button", "primary", "Restart A-OS");
           restart.type = "button";
           restart.addEventListener("click", function () { window.AOS_NATIVE_BRIDGE.post("/__aos/power/restart", {}); });
@@ -240,7 +244,7 @@
     if ((!force && !shouldShow()) || overlay || !document.body) return;
     step = 0;
     selectedTarget = "";
-    targets = [{id: "live", mode: "live", name: "A-OS live system", description: "Try A-OS without changing this computer", size: "Safe option", removable: false, installable: true}];
+    targets = [{id: "live", mode: "live", name: "Try A-OS from this USB", description: "Does not install A-OS and will not boot after the USB is removed", size: "Try only", removable: true, installable: true}];
     overlay = element("section", "aos-installer");
     overlay.id = "aos-installation-wizard";
     overlay.setAttribute("role", "dialog");
@@ -258,6 +262,13 @@
           removable: Boolean(item.removable), installable: item.installable !== false,
           blockedReason: item.blockedReason || ""
         });
+      });
+      targets.sort(function (left, right) {
+        if (left.id === "live") return 1;
+        if (right.id === "live") return -1;
+        if (left.mode === "alongside" && right.mode !== "alongside") return -1;
+        if (right.mode === "alongside" && left.mode !== "alongside") return 1;
+        return Number(left.removable) - Number(right.removable);
       });
       render();
     }).catch(function () {});
