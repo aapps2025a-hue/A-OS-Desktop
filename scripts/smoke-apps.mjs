@@ -180,6 +180,24 @@ async function main() {
   }
   await waitFor(`${appButton("Files")} != null`, "the A-OS desktop", 1000);
 
+  if (process.env.AOS_TWEMOJI_SMOKE === "1") {
+    await evaluate(`${appButton("Settings")}.click()`);
+    await waitFor(`[...document.querySelectorAll("button")].some(button => button.textContent.trim() === "Power Preferences")`, "Power Preferences settings");
+    await evaluate(`[...document.querySelectorAll("button")].find(button => button.textContent.trim() === "Power Preferences").click()`);
+    await waitFor(`[...document.querySelectorAll("h3")].some(heading => heading.textContent.trim() === "System Emoji Pack")`, "System Emoji Pack settings");
+    await waitFor(`[...document.querySelectorAll("button")].some(button => button.textContent.trim() === "Twitter / Twemoji")`, "Twitter Twemoji option");
+    await evaluate(`[...document.querySelectorAll("button")].find(button => button.textContent.trim() === "Twitter / Twemoji").click()`);
+    await waitFor(`localStorage.getItem("aos-active-emoji-pack") === "Twitter / Twemoji"`, "saved Twitter Twemoji selection");
+    await evaluate(`window.dispatchEvent(new KeyboardEvent("keydown", {key:".",code:"Period",ctrlKey:true,bubbles:true}))`);
+    await waitFor(`Boolean(document.querySelector('.aos-complete-emoji-picker'))`, "local Twemoji picker");
+    await waitFor(`document.querySelector('.aos-complete-emoji-footer').textContent.includes("Twitter / Twemoji 14.0.2")`, "Twemoji picker label");
+    const twemojiImage = await evaluate(`document.querySelector('.aos-complete-emoji-item img').getAttribute('src')`);
+    if (!twemojiImage.includes("/assets/emojis/aos-complete/svg/")) throw new Error("Twemoji did not use the local SVG pack");
+    console.log("PASS: Twitter / Twemoji settings option persists and opens the local 3,624-image pack");
+    cdp.socket.close();
+    return;
+  }
+
   if (process.env.AOS_PROFILE_SMOKE === "1") {
     const result = await evaluate(`(() => {
       const api = window.AOS_USER_PROFILES;

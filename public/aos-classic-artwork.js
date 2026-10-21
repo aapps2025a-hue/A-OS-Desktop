@@ -74,18 +74,7 @@
   }
 
   function removeEmojiSettings(root) {
-    var scope = root && root.querySelectorAll ? root : document;
-    scope.querySelectorAll("h3").forEach(function (heading) {
-      if ((heading.textContent || "").trim() !== "System Emoji Pack") return;
-      var card = heading.closest("div.p-6");
-      if (card) card.remove();
-    });
-
-    scope.querySelectorAll("p").forEach(function (paragraph) {
-      if ((paragraph.textContent || "").indexOf("System diagnostics, uptime, emoji packs") !== -1) {
-        paragraph.textContent = "System diagnostics, uptime, live index editor, and full system backup.";
-      }
-    });
+    // Emoji pack settings are part of the classic A-OS experience again.
   }
 
   function versionClassicAsset(value) {

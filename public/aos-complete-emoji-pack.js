@@ -162,7 +162,8 @@
   }
 
   function filteredItems() {
-    var all = state.originals.concat(state.unicode);
+    var twemojiOnly = localStorage.getItem("aos-active-emoji-pack") === "Twitter / Twemoji";
+    var all = twemojiOnly ? state.unicode : state.originals.concat(state.unicode);
     var group = state.group;
     var query = state.query.trim().toLowerCase();
     return all.filter(function (item) {
@@ -174,7 +175,8 @@
 
   function renderCategories(container) {
     container.textContent = "";
-    state.groups.forEach(function (group) {
+    var twemojiOnly = localStorage.getItem("aos-active-emoji-pack") === "Twitter / Twemoji";
+    state.groups.filter(function (group) { return !twemojiOnly || group !== "A-OS Originals"; }).forEach(function (group) {
       var chip = button("aos-complete-emoji-category", group);
       chip.setAttribute("aria-pressed", String(group === state.group));
       chip.addEventListener("click", function () {
@@ -252,8 +254,9 @@
       });
       body.appendChild(more);
     }
+    var twemojiOnly = localStorage.getItem("aos-active-emoji-pack") === "Twitter / Twemoji";
     footer.textContent = shown.length + " of " + results.length + " shown | " +
-      (state.originals.length + state.unicode.length) + " emoji installed locally";
+      (twemojiOnly ? "Twitter / Twemoji 14.0.2" : (state.originals.length + state.unicode.length) + " emoji installed locally");
   }
 
   function renderClipboardView(body, footer) {
