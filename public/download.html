@@ -11,7 +11,7 @@
   <body>
     <nav>
       <a class="brand" href="./"><img src="./assets/icons/OS Logo.png" alt=""><span>A-OS</span></a>
-      <div><a href="#install">Installation</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
+      <div><a href="#install">Installation</a><a href="#repair">Repair</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
     </nav>
     <main>
       <section class="hero">
@@ -21,6 +21,7 @@
           <span>A bootable desktop with persistent files, hardware controls, Family Device, A-Store and A-AI.</span>
           <div class="actions">
             <a class="primary" href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Desktop-amd64.iso">Download ISO</a>
+            <a href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Network-Repair-20261021.deb">Repair installed A-OS</a>
             <a href="./">Try A-OS</a>
           </div>
           <small>64-bit Intel/AMD UEFI computers. Disable Secure Boot before installation.</small>
@@ -33,6 +34,15 @@
           <li><b>Boot the USB</b><span>Select the USB from the computer's UEFI boot menu.</span></li>
           <li><b>Choose a disk</b><span>Install beside Windows in unallocated space, or erase a selected empty disk.</span></li>
           <li><b>Finish installation</b><span>Wait for the completed message, remove the USB, and restart into A-OS.</span></li>
+        </ol>
+      </section>
+      <section class="install" id="repair">
+        <header><p>Already installed</p><h2>Repair Wi-Fi without reinstalling</h2></header>
+        <ol>
+          <li><b>Use a working connection</b><span>Connect the A-OS computer to a phone hotspot or Ethernet temporarily.</span></li>
+          <li><b>Download the repair</b><span>Get the A-OS Network Repair package from this page and keep it in Downloads.</span></li>
+          <li><b>Install once</b><span>Open an administrator terminal and run <code>sudo apt install ./A-OS-Network-Repair-20261021.deb</code> from Downloads.</span></li>
+          <li><b>Restart A-OS</b><span>The repair updates networking and clock synchronization only. It does not erase users, files, settings, Windows, or partitions.</span></li>
         </ol>
       </section>
       <section class="details" id="about">
