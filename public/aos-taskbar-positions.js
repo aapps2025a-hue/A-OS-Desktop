@@ -52,7 +52,7 @@
     ".aos-lock-power-screen img{width:88px;height:88px;object-fit:contain}.aos-lock-power-screen h1,.aos-lock-power-screen p{margin:0}",
     ".aos-lock-power-screen p{color:#9fb2c1}.aos-lock-power-screen button{color:#07111a;background:#69dbea;border:0;border-radius:8px;padding:12px 18px;font-weight:900;cursor:pointer}",
     "@media(max-width:700px){.aos-os-center-status{grid-template-columns:1fr}.aos-os-center-hero{grid-template-columns:48px 1fr;padding:22px}.aos-os-center-hero img{width:46px;height:46px}.login-power-controls{right:12px;bottom:10px}.login-power-controls span{display:none}}",
-    "@media (hover:none) and (pointer:coarse){.desktop #aos-custom-pointer{display:none!important;opacity:0!important}.desktop,.desktop *{cursor:auto!important}}"
+    "@media (hover:none) and (pointer:coarse){.desktop #aos-custom-pointer{display:block}.desktop,.desktop *{cursor:none!important}}"
   ].join("");
   document.head.appendChild(style);
 

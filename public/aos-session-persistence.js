@@ -27,7 +27,17 @@
       var identity = slug || title.toLowerCase();
       if (seen.has(identity)) return null;
       seen.add(identity);
-      return {title: title, slug: slug};
+      var bounds = element.getBoundingClientRect();
+      return {
+        title: title,
+        slug: slug,
+        geometry: {
+          left: Math.round(bounds.left),
+          top: Math.round(bounds.top),
+          width: Math.round(bounds.width),
+          height: Math.round(bounds.height)
+        }
+      };
     }).filter(Boolean);
   }
 
@@ -44,7 +54,7 @@
 
   function save(reason) {
     var snapshot = {
-      version: 1,
+      version: 2,
       reason: reason || "hibernate",
       savedAt: Date.now(),
       apps: openApps(),
@@ -84,14 +94,52 @@
     }) || null;
   }
 
+  function findRestoredWindow(app) {
+    if (app.slug) {
+      return Array.from(document.querySelectorAll("[data-a-store-slug]")).find(function (element) {
+        return element.dataset.aStoreSlug === app.slug && visible(element);
+      }) || null;
+    }
+    var wanted = normalized(app.title);
+    return Array.from(document.querySelectorAll(".system-window, .astore-window-layer")).find(function (element) {
+      var heading = element.querySelector(".window-title, .astore-window-head strong, header b, header strong, header h1, header h2");
+      return visible(element) && normalized(textOf(heading)) === wanted;
+    }) || null;
+  }
+
+  function restoreGeometry(app) {
+    if (!app.geometry) return;
+    var attempts = 0;
+    var timer = window.setInterval(function () {
+      attempts += 1;
+      var element = findRestoredWindow(app);
+      if (!element && attempts < 30) return;
+      window.clearInterval(timer);
+      if (!element) return;
+      var maxWidth = Math.max(320, window.innerWidth - 20);
+      var maxHeight = Math.max(240, window.innerHeight - 20);
+      var width = Math.min(maxWidth, Math.max(320, Number(app.geometry.width) || 720));
+      var height = Math.min(maxHeight, Math.max(240, Number(app.geometry.height) || 520));
+      var left = Math.max(0, Math.min(window.innerWidth - width, Number(app.geometry.left) || 0));
+      var top = Math.max(0, Math.min(window.innerHeight - height, Number(app.geometry.top) || 0));
+      element.style.inset = "auto";
+      element.style.left = left + "px";
+      element.style.top = top + "px";
+      element.style.width = width + "px";
+      element.style.height = height + "px";
+    }, 120);
+  }
+
   function restoreOpenApps(snapshot) {
     var apps = Array.isArray(snapshot && snapshot.apps) ? snapshot.apps : [];
     apps.forEach(function (app, index) {
       window.setTimeout(function () {
         window.dispatchEvent(new CustomEvent("aos-restore-app", {detail: app}));
-        if (app.slug) return;
-        var control = launchControl(app.title);
-        if (control) control.click();
+        if (!app.slug) {
+          var control = launchControl(app.title);
+          if (control) control.click();
+        }
+        restoreGeometry(app);
       }, index * 220);
     });
   }

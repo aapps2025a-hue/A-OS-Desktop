@@ -1,7 +1,9 @@
 import importlib.util
+import io
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import tarfile
 import unittest
 from unittest.mock import MagicMock, call, patch
 
@@ -480,6 +482,33 @@ Boot0007* A-OS
         script = (REPOSITORY / "iso/config/includes.chroot/etc/skel/.xinitrc").read_text(encoding="utf-8")
         self.assertIn("/a-os.html?aosLiveIso=1", script)
         self.assertNotIn("/index.html?aosLiveIso=1", script)
+
+    def test_update_archive_stages_and_atomically_installs_native_service(self):
+        source = SERVER_PATH.read_bytes()
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive_path = root / "update.tar.gz"
+            member_name = "A-OS-Desktop-revision/iso/config/includes.chroot/usr/local/lib/aos/server.py"
+            with tarfile.open(archive_path, "w:gz") as archive:
+                member = tarfile.TarInfo(member_name)
+                member.size = len(source)
+                archive.addfile(member, io.BytesIO(source))
+            staged = root / "staged-server.py"
+            installed = root / "installed-server.py"
+            SERVER.extract_native_server(archive_path, staged)
+            original_target = SERVER.NATIVE_SERVER_PATH
+            SERVER.NATIVE_SERVER_PATH = installed
+            try:
+                SERVER.install_native_server(staged)
+            finally:
+                SERVER.NATIVE_SERVER_PATH = original_target
+            self.assertEqual(installed.read_bytes(), source)
+            if os.name != "nt":
+                self.assertTrue(installed.stat().st_mode & 0o100)
+
+    def test_native_hibernate_dialog_uses_session_saving_bridge(self):
+        runtime = (REPOSITORY / "public/aos-live-native-runtime.js").read_text(encoding="utf-8")
+        self.assertIn('window.aosPowerBridge.perform(action)', runtime)
 
 
 if __name__ == "__main__":

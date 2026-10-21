@@ -578,7 +578,10 @@
         localStorage.setItem("aos-last-power-action", JSON.stringify({action: action, at: Date.now()}));
       } catch (_) {}
       window.dispatchEvent(new CustomEvent("aos-before-power", {detail: {action: action}}));
-      window.AOS_NATIVE_BRIDGE.post("/__aos/power/" + action, {}).then(function () {
+      var powerRequest = window.aosPowerBridge && typeof window.aosPowerBridge.perform === "function"
+        ? window.aosPowerBridge.perform(action)
+        : window.AOS_NATIVE_BRIDGE.post("/__aos/power/" + action, {});
+      powerRequest.then(function () {
         overlay.innerHTML = "";
         var state = element("section", "aos-native-power-state");
         var logo = document.createElement("img");

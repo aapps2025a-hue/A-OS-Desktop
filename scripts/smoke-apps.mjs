@@ -310,6 +310,50 @@ async function main() {
     throw new Error(`Account restore did not return a JSON response: ${JSON.stringify(syncResponse)}`);
   }
 
+  const storeWindowResult = await evaluate(`(() => {
+    const app = {
+      slug: "smoke-window-app",
+      name: "Smoke Window App",
+      description: "A window lifecycle check",
+      category: "Tools",
+      version: "1.0.0",
+      logo: "/assets/icons/Code.png",
+      files: {"index.html": "<!doctype html><title>Smoke</title><main>Store app is running</main>"}
+    };
+    window.AOS_STORE_PLATFORM.installApp(app);
+    window.AOS_STORE_PLATFORM.openApp(app);
+    const layer = document.querySelector('[data-a-store-slug="smoke-window-app"]');
+    const header = layer && layer.querySelector(".astore-window-head");
+    if (!layer || !header) throw Error("A-Store app did not create its own window");
+    const start = layer.getBoundingClientRect();
+    header.dispatchEvent(new PointerEvent("pointerdown", {bubbles:true,button:0,clientX:start.left+40,clientY:start.top+20,pointerId:4}));
+    window.dispatchEvent(new PointerEvent("pointermove", {bubbles:true,clientX:start.left+120,clientY:start.top+65,pointerId:4}));
+    window.dispatchEvent(new PointerEvent("pointerup", {bubbles:true,clientX:start.left+120,clientY:start.top+65,pointerId:4}));
+    const end = layer.getBoundingClientRect();
+    const registered = JSON.parse(localStorage.getItem("aos-dev-apps") || "[]").some((item) => item.storeSlug === app.slug);
+    const taskbar = Boolean(document.querySelector('[data-astore-shelf="smoke-window-app"]'));
+    return window.AOS_SESSION_PERSISTENCE.save("hibernate").then((snapshot) => ({
+      registered,
+      taskbar,
+      moved: Math.abs(end.left - start.left) > 20 || Math.abs(end.top - start.top) > 20,
+      saved: snapshot.apps.some((item) => item.slug === app.slug && item.geometry && item.geometry.width > 300)
+    }));
+  })()`);
+  if (!storeWindowResult.registered || !storeWindowResult.taskbar || !storeWindowResult.moved || !storeWindowResult.saved) {
+    throw new Error(`A-Store window or hibernate persistence regression: ${JSON.stringify(storeWindowResult)}`);
+  }
+  await evaluate(`document.querySelector('[data-a-store-slug="smoke-window-app"] .astore-close').click(); localStorage.removeItem("aos-hibernate-restore-pending")`);
+  await waitFor(`!document.querySelector('[data-a-store-slug="smoke-window-app"]') && !document.querySelector('[data-astore-shelf="smoke-window-app"]')`, "the A-Store app window and taskbar entry to close");
+
+  const touchPointerResult = await evaluate(`(() => {
+    const pointer = document.querySelector("#aos-custom-pointer");
+    window.dispatchEvent(new PointerEvent("pointermove", {bubbles:true,pointerType:"touch",clientX:73,clientY:91,pointerId:8}));
+    return {exists:Boolean(pointer), transform:pointer ? pointer.style.transform : "", ready:pointer ? pointer.classList.contains("pointer-ready") : false};
+  })()`);
+  if (!touchPointerResult.exists || !touchPointerResult.ready || !touchPointerResult.transform.includes("73px") || !touchPointerResult.transform.includes("91px")) {
+    throw new Error(`Touch pointer did not follow the contact point: ${JSON.stringify(touchPointerResult)}`);
+  }
+
   await evaluate(`
     localStorage.setItem("aos-family-active-member", JSON.stringify({id:"smoke-child",name:"Alex",ageGroup:"7-",signedInAt:Date.now()}));
     location.reload();

@@ -28,6 +28,7 @@ READY_FILE = Path(os.environ.get("AOS_READY_FILE", "/tmp/aos-browser-ready"))
 PORT = int(os.environ.get("AOS_PORT", "5000"))
 REMOTE_VERSION_URL = "https://a-os-desktop.web.app/version.json"
 SOURCE_ARCHIVE_URL = "https://github.com/aapps2025a-hue/A-OS-Desktop/archive/{revision}.tar.gz"
+NATIVE_SERVER_PATH = Path(os.environ.get("AOS_NATIVE_SERVER_PATH", "/usr/local/lib/aos/server.py")).resolve()
 MAX_BODY = 256 * 1024
 COMMAND_TIMEOUT = 12
 VERSION_CACHE_SECONDS = 30
@@ -1362,6 +1363,35 @@ def safe_extract_public(archive_path, destination):
                 shutil.copyfileobj(source, handle)
 
 
+def extract_native_server(archive_path, destination):
+    suffix = "/iso/config/includes.chroot/usr/local/lib/aos/server.py"
+    destination = Path(destination).resolve()
+    with tarfile.open(archive_path, "r:gz") as archive:
+        matches = [member for member in archive.getmembers() if member.name.endswith(suffix)]
+        if len(matches) != 1:
+            raise RuntimeError("The update does not contain one verified A-OS hardware service")
+        member = matches[0]
+        if not member.isfile() or member.issym() or member.islnk() or member.size > 2 * MIB:
+            raise RuntimeError("The A-OS hardware service in the update is invalid")
+        source = archive.extractfile(member)
+        if source is None:
+            raise RuntimeError("The A-OS hardware service in the update is incomplete")
+        with source, destination.open("wb") as handle:
+            shutil.copyfileobj(source, handle)
+    source_text = destination.read_text(encoding="utf-8")
+    if not source_text.startswith("#!/usr/bin/env python3") or "class AosHandler" not in source_text:
+        raise RuntimeError("The updated A-OS hardware service failed validation")
+    compile(source_text, str(destination), "exec")
+
+
+def install_native_server(staged_server):
+    NATIVE_SERVER_PATH.parent.mkdir(parents=True, exist_ok=True)
+    pending = NATIVE_SERVER_PATH.with_name("." + NATIVE_SERVER_PATH.name + ".update")
+    shutil.copyfile(staged_server, pending)
+    pending.chmod(0o755)
+    os.replace(pending, NATIVE_SERVER_PATH)
+
+
 def update_worker(version):
     work = None
     partial_release = None
@@ -1392,6 +1422,8 @@ def update_worker(version):
         shutil.rmtree(partial_release, ignore_errors=True)
         partial_release.mkdir()
         safe_extract_public(archive_path, partial_release)
+        staged_server = work / "server.py"
+        extract_native_server(archive_path, staged_server)
         if not (partial_release / "index.html").is_file():
             raise RuntimeError("The update is missing the A-OS start page")
         set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="installing", progress=76, message="Installing the update in the background")
@@ -1410,8 +1442,9 @@ def update_worker(version):
             pass
         next_link.symlink_to(release, target_is_directory=True)
         os.replace(next_link, ACTIVE_RELEASE)
+        install_native_server(staged_server)
         require_command(["sync"], timeout=60)
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="complete", progress=100, message="A-OS is updated. Restart to use the new version.")
+        set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="complete", progress=100, message="A-OS and its device services are updated. Restart to use the new version.")
     except Exception as error:
         set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="error", error=str(error), message="The update was not installed")
     finally:

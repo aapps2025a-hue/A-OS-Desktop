@@ -18,6 +18,9 @@
   var TEXT_FILE = /\.(?:html?|css|js|mjs|cjs|json|txt|md|xml|svg|csv|tsv|yml|yaml|toml|ini|conf)$/i;
   var state = {apps: [], loading: false, error: "", refreshedAt: 0, installPrompt: null, apkIndex: {}, apkRefreshedAt: 0};
   var subscribers = new Set();
+  var appWindowZ = 8200;
+  var appWindowCascade = 0;
+  var STORE_WEB_RUNTIME = "https://scramjet.mercurywork.shop/";
 
   var BUILT_INS = [
     {slug: "a-store-dev", name: "A-Store Dev", description: "Build, review, publish, and update A-Store apps from a folder or A-OS Files.", category: "Tools", version: "1.0.0", logo: asset("Code.png"), preview: asset("Code.png"), builtin: true, trusted: true, downloads: 1000},
@@ -345,6 +348,7 @@
       state.error = error && error.message || "A-Store is using the local catalog.";
     } finally {
       state.loading = false;
+      syncInstalledAppRegistry();
       emit();
     }
     return state.apps;
@@ -438,31 +442,45 @@
     return installed === app.version ? "open" : "update";
   }
 
+  function registerInstalledApp(app) {
+    if (!app || app.slug === "a-store-dev") return;
+    var devApps = safeJson("aos-dev-apps", []);
+    if (!Array.isArray(devApps)) devApps = [];
+    var existing = devApps.find(function (item) { return item.storeSlug === app.slug; });
+    var packaged = {
+      name: app.name,
+      domain: app.slug + ".store.a-os.local",
+      url: app.files && app.files["index.html"] ? "aos://store/" + app.slug : app.url,
+      category: app.category,
+      description: app.description,
+      version: app.version,
+      storeSlug: app.slug,
+      icon: app.logo,
+      createdAt: existing && existing.createdAt || new Date().toISOString()
+    };
+    if (app.files && app.files["index.html"]) packaged.devCode = compileAppDocument(app);
+    devApps = devApps.filter(function (item) { return item.storeSlug !== app.slug; });
+    devApps.push(packaged);
+    if (!existing || JSON.stringify(existing) !== JSON.stringify(packaged)) {
+      safeSet("aos-dev-apps", JSON.stringify(devApps));
+      window.dispatchEvent(new CustomEvent("aos-installed-apps-changed", {detail: {app: packaged}}));
+    }
+  }
+
+  function syncInstalledAppRegistry() {
+    var installed = installedVersions();
+    state.apps.forEach(function (app) {
+      if (installed[app.slug]) registerInstalledApp(app);
+    });
+  }
+
   function installApp(app) {
     var previousState = installationState(app);
     var installed = installedVersions();
     installed[app.slug] = app.version;
     safeSet(INSTALLED_KEY, JSON.stringify(installed));
     if (app.slug === "a-store-dev") safeSet("aos-store-dev-installed", "true");
-    if (app.files && app.files["index.html"]) {
-      var devApps = safeJson("aos-dev-apps", []);
-      if (!Array.isArray(devApps)) devApps = [];
-      var packaged = {
-        name: app.name,
-        domain: app.slug + ".store.a-os.local",
-        url: "aos://store/" + app.slug,
-        category: app.category,
-        description: app.description,
-        devCode: compileAppDocument(app),
-        version: app.version,
-        storeSlug: app.slug,
-        icon: app.logo,
-        createdAt: new Date().toISOString()
-      };
-      devApps = devApps.filter(function (item) { return item.storeSlug !== app.slug; });
-      devApps.push(packaged);
-      safeSet("aos-dev-apps", JSON.stringify(devApps));
-    }
+    registerInstalledApp(app);
     incrementDownload(app);
     notify(app.name + (previousState === "update" ? " updated" : " installed"));
     ensureShelfButton();
@@ -633,25 +651,117 @@
 
   function openApp(app) {
     if (app.slug === "a-store-dev") return openDeveloper();
-    if (app.url && !app.files["index.html"]) {
-      if (document.documentElement.dataset.aosStoreStandalone === "true") {
-        location.href = app.url;
-      } else {
-        localStorage.setItem("aos-browser-pending-tab", JSON.stringify({url: app.url, title: app.name}));
-        window.dispatchEvent(new CustomEvent("aos-open-weba", {detail: {url: app.url, title: app.name}}));
-        notify(app.name + " opened in OSInternet");
-      }
+    var existing = Array.from(document.querySelectorAll(".astore-app-instance[data-a-store-slug]")).find(function (layer) {
+      return layer.dataset.aStoreSlug === app.slug;
+    });
+    if (existing) {
+      focusAppWindow(existing);
       return;
     }
-    if (!app.files["index.html"]) return notify("This app does not include index.html.");
+    var files = app.files && typeof app.files === "object" ? app.files : {};
+    var remote = Boolean(app.url && !files["index.html"]);
+    if (remote && document.documentElement.dataset.aosStoreStandalone === "true") {
+      location.href = app.url;
+      return;
+    }
+    if (!remote && !files["index.html"]) return notify("This app does not include index.html.");
     var layer = document.createElement("div");
-    layer.className = "astore-window-layer astore-shell";
+    layer.className = "astore-window-layer astore-shell astore-app-instance";
     layer.dataset.aStoreSlug = app.slug;
+    layer.dataset.aStoreName = app.name;
+    layer.dataset.aStoreLogo = app.logo;
     layer.innerHTML = '<section class="astore-app-window"><header class="astore-window-head"><img src="' + escapeHtml(app.logo) + '" alt=""><span><strong>' + escapeHtml(app.name) + '</strong><small>A-Store app - version ' + escapeHtml(app.version) + '</small></span><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><iframe title="' + escapeHtml(app.name) + '" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads" referrerpolicy="no-referrer"></iframe></section>';
-    layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); ensureShelfButton(); });
-    layer.querySelector("iframe").srcdoc = compileAppDocument(app);
+    layer.querySelector(".astore-close").addEventListener("click", function () { closeAppWindow(layer); });
+    var frame = layer.querySelector("iframe");
+    if (remote) {
+      frame.setAttribute("sandbox", "allow-scripts allow-forms allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads allow-presentation");
+      frame.setAttribute("allow", "clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media; picture-in-picture; web-share");
+      frame.src = STORE_WEB_RUNTIME + "?goto=" + encodeURIComponent(app.url);
+    } else {
+      frame.srcdoc = compileAppDocument(app);
+    }
     document.body.appendChild(layer);
-    ensureShelfButton(app);
+    activateAppWindow(layer);
+    ensureShelfButton();
+  }
+
+  function focusAppWindow(layer) {
+    if (!layer) return;
+    appWindowZ = appWindowZ >= 9800 ? 8200 : appWindowZ + 1;
+    document.querySelectorAll(".astore-app-instance.astore-window-active").forEach(function (windowElement) {
+      windowElement.classList.remove("astore-window-active");
+    });
+    layer.classList.add("astore-window-active");
+    layer.style.zIndex = String(appWindowZ);
+  }
+
+  function closeAppWindow(layer) {
+    if (layer) layer.remove();
+    ensureShelfButton();
+  }
+
+  function activateAppWindow(layer) {
+    if (!layer || layer.dataset.aStoreInteractive === "true") return;
+    layer.dataset.aStoreInteractive = "true";
+    var offset = appWindowCascade++ % 7;
+    var width = Math.min(1040, Math.max(360, window.innerWidth - 48));
+    var height = Math.min(720, Math.max(260, window.innerHeight - 104));
+    layer.style.left = Math.max(8, Math.round((window.innerWidth - width) / 2) + offset * 16) + "px";
+    layer.style.top = Math.max(8, Math.round((window.innerHeight - height) / 2) + offset * 12) + "px";
+    var header = layer.querySelector(".astore-window-head");
+    if (header) {
+      header.addEventListener("pointerdown", function (event) {
+        if (event.button !== 0 || event.target.closest("button, input, select, textarea, a")) return;
+        event.preventDefault();
+        focusAppWindow(layer);
+        var bounds = layer.getBoundingClientRect();
+        var startX = event.clientX;
+        var startY = event.clientY;
+        var originX = bounds.left;
+        var originY = bounds.top;
+        function move(moveEvent) {
+          var nextX = Math.max(0, Math.min(window.innerWidth - 80, originX + moveEvent.clientX - startX));
+          var nextY = Math.max(0, Math.min(window.innerHeight - 54, originY + moveEvent.clientY - startY));
+          layer.style.left = nextX + "px";
+          layer.style.top = nextY + "px";
+        }
+        function stop() {
+          window.removeEventListener("pointermove", move, true);
+          window.removeEventListener("pointerup", stop, true);
+          window.removeEventListener("pointercancel", stop, true);
+        }
+        window.addEventListener("pointermove", move, true);
+        window.addEventListener("pointerup", stop, true);
+        window.addEventListener("pointercancel", stop, true);
+      });
+      header.addEventListener("dblclick", function (event) {
+        if (event.target.closest("button")) return;
+        if (layer.dataset.aStoreMaximized === "true") {
+          var saved = safeJson("aos-store-window:" + layer.dataset.aStoreSlug, null);
+          if (saved) {
+            layer.style.left = saved.left;
+            layer.style.top = saved.top;
+            layer.style.width = saved.width;
+            layer.style.height = saved.height;
+          }
+          layer.dataset.aStoreMaximized = "false";
+        } else {
+          safeSet("aos-store-window:" + layer.dataset.aStoreSlug, JSON.stringify({
+            left: layer.style.left,
+            top: layer.style.top,
+            width: layer.style.width || getComputedStyle(layer).width,
+            height: layer.style.height || getComputedStyle(layer).height
+          }));
+          layer.dataset.aStoreMaximized = "true";
+          layer.style.left = "8px";
+          layer.style.top = "8px";
+          layer.style.width = "calc(100vw - 16px)";
+          layer.style.height = "calc(100dvh - 84px)";
+        }
+      });
+    }
+    layer.addEventListener("pointerdown", function () { focusAppWindow(layer); });
+    focusAppWindow(layer);
   }
 
   function showAosAlert(appName, message) {
@@ -762,22 +872,38 @@
     });
   }
 
-  function ensureShelfButton(openAppValue) {
+  function ensureShelfButton() {
+    var running = Array.from(document.querySelectorAll(".astore-app-instance[data-a-store-slug]")).map(function (layer) {
+      return {
+        slug: layer.dataset.aStoreSlug,
+        name: layer.dataset.aStoreName || "A-Store app",
+        logo: layer.dataset.aStoreLogo || asset("Code.png"),
+        layer: layer
+      };
+    });
     document.querySelectorAll(".shelf").forEach(function (shelf) {
-      var existing = shelf.querySelector("[data-astore-shelf]");
-      var shouldShow = Boolean(openAppValue || safeGet("aos-store-dev-installed", "") === "true" && document.querySelector(".astore-dev-window"));
-      if (!shouldShow) {
-        if (existing) existing.remove();
-        return;
-      }
-      if (existing) return;
-      var button = document.createElement("button");
-      button.className = "astore-shelf-button";
-      button.dataset.astoreShelf = "true";
-      button.title = openAppValue ? openAppValue.name : "A-Store Dev";
-      button.innerHTML = '<img src="' + escapeHtml(openAppValue ? openAppValue.logo : asset("Code.png")) + '" alt="">';
-      button.addEventListener("click", function () { if (openAppValue) openApp(openAppValue); else openDeveloper(); });
-      shelf.insertBefore(button, shelf.querySelector(".status") || null);
+      Array.from(shelf.querySelectorAll("[data-astore-shelf]")).forEach(function (button) {
+        if (!running.some(function (app) { return app.slug === button.dataset.astoreShelf; })) button.remove();
+      });
+      running.forEach(function (app) {
+        var existing = Array.from(shelf.querySelectorAll("[data-astore-shelf]")).find(function (button) {
+          return button.dataset.astoreShelf === app.slug;
+        });
+        if (existing) return;
+        var button = document.createElement("button");
+        button.className = "astore-shelf-button state-open";
+        button.dataset.astoreShelf = app.slug;
+        button.title = app.name;
+        button.setAttribute("aria-label", app.name);
+        button.innerHTML = '<img src="' + escapeHtml(app.logo) + '" alt="">';
+        button.addEventListener("click", function () {
+          var current = Array.from(document.querySelectorAll(".astore-app-instance[data-a-store-slug]")).find(function (layer) {
+            return layer.dataset.aStoreSlug === app.slug;
+          });
+          if (current) focusAppWindow(current);
+        });
+        shelf.insertBefore(button, shelf.querySelector(".status") || null);
+      });
     });
   }
 
@@ -881,7 +1007,10 @@
 
   function openDeveloper(existingApp) {
     var previous = document.querySelector(".astore-dev-window");
-    if (previous) return;
+    if (previous) {
+      focusAppWindow(previous.closest(".astore-window-layer"));
+      return;
+    }
     var project = existingApp && existingApp.files && Object.keys(existingApp.files).length ? Object.assign({}, existingApp.files) : defaultProject();
     var selected = project["index.html"] !== undefined ? "index.html" : Object.keys(project)[0];
     var metadata = {
@@ -895,9 +1024,13 @@
       video: existingApp ? existingApp.video : ""
     };
     var layer = document.createElement("div");
-    layer.className = "astore-window-layer astore-shell";
+    layer.className = "astore-window-layer astore-shell astore-app-instance";
+    layer.dataset.aStoreSlug = "a-store-dev";
+    layer.dataset.aStoreName = "A-Store Dev";
+    layer.dataset.aStoreLogo = asset("Code.png");
     layer.innerHTML = '<section class="astore-dev-window"><header class="astore-window-head"><img src="' + asset("Code.png") + '" alt=""><span><strong>A-Store Dev</strong><small>HTML app studio - folders, local backend routes, publishing, and updates</small></span><button data-preview>Preview</button><button data-publish-panel>Publish</button><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><div class="astore-dev-layout"><aside class="astore-dev-files"><div class="astore-dev-toolbar"><button data-new>New file</button><button data-backend>Backend</button></div><div class="astore-dev-toolbar"><button data-aos-folder>A-OS Files</button><button data-device-folder>Device folder</button><input type="file" webkitdirectory multiple hidden data-folder-input></div><div class="astore-file-list" data-file-list></div></aside><main class="astore-dev-editor"><div class="astore-editor-head" data-editor-name></div><textarea class="astore-code-editor" spellcheck="false" data-editor></textarea></main><aside class="astore-dev-publish" data-publish><h3>Publish to A-Store</h3><p>Apps appear in the catalog immediately. Promotion is reserved for one-week show-off selections and highly downloaded apps.</p><label class="astore-field">App name<input data-meta="name" maxlength="64"></label><label class="astore-field">Store ID<input data-meta="slug" maxlength="64"></label><label class="astore-field">Description<textarea data-meta="description" maxlength="400"></textarea></label><label class="astore-field">Category<select data-meta="category">' + CATEGORIES.map(function (category) { return '<option>' + category + '</option>'; }).join("") + '</select></label><label class="astore-field">Version<input data-meta="version" maxlength="20"></label><div class="astore-media-pickers"><label class="astore-media-picker" data-logo-picker>Logo<input type="file" accept="image/*" hidden data-media="logo"></label><label class="astore-media-picker" data-preview-picker>Preview<input type="file" accept="image/*" hidden data-media="preview"></label><label class="astore-media-picker" data-video-picker>Video<input type="file" accept="video/mp4,video/webm" hidden data-media="video"></label></div><label class="astore-field">Preview video URL (optional)<input data-meta="video" placeholder="https://..."></label><div class="astore-login-note" data-login-note></div><div class="astore-publish-status" data-status>Ready to scan this project.</div><div class="astore-inline-actions"><button data-scan>Check app</button><button class="primary" data-submit>Publish now</button></div></aside></div></section>';
     document.body.appendChild(layer);
+    activateAppWindow(layer);
     ensureShelfButton();
     var editor = layer.querySelector("[data-editor]");
     var fileList = layer.querySelector("[data-file-list]");
@@ -998,7 +1131,7 @@
     var developerSignIn = layer.querySelector("[data-dev-signin]");
     if (developerSignIn) developerSignIn.addEventListener("click", openAccountDialog);
     editor.addEventListener("input", syncEditor);
-    layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); ensureShelfButton(); });
+    layer.querySelector(".astore-close").addEventListener("click", function () { closeAppWindow(layer); });
     layer.querySelector("[data-publish-panel]").addEventListener("click", function () { publishPanel.scrollTop = 0; });
     layer.querySelector("[data-new]").addEventListener("click", async function () {
       var path = await askFileName();
@@ -1082,7 +1215,7 @@
     window.addEventListener("aos-restore-app", function (event) {
       var detail = event.detail || {};
       if (!detail.slug) return;
-      var app = state.apps.concat(BUILT_INS).find(function (candidate) { return candidate.slug === detail.slug; });
+      var app = state.apps.concat(BUILT_INS, localApps()).find(function (candidate) { return candidate.slug === detail.slug; });
       if (app) openApp(app);
     });
   }
