@@ -73,6 +73,42 @@ def run(command, timeout=COMMAND_TIMEOUT, input_text=None):
         return 127, "", str(error)
 
 
+def wifi_device_name():
+    code, output, _ = run(
+        ["nmcli", "--terse", "--escape", "yes", "-f", "DEVICE,TYPE", "device", "status"]
+    )
+    if code != 0:
+        return ""
+    for line in output.splitlines():
+        fields = split_nmcli(line)
+        if len(fields) >= 2 and fields[1] in {"wifi", "802-11-wireless"}:
+            return fields[0]
+    return ""
+
+
+def repair_wifi_profile(ssid, password):
+    device = wifi_device_name()
+    if not device:
+        return 10, "", "No Wi-Fi device found"
+
+    profile = "A-OS Wi-Fi - " + ssid
+    run(["nmcli", "connection", "delete", "id", profile])
+    code, output, error = run([
+        "nmcli", "connection", "add",
+        "type", "wifi",
+        "ifname", device,
+        "con-name", profile,
+        "ssid", ssid,
+        "802-11-wireless-security.key-mgmt", "wpa-psk",
+        "802-11-wireless-security.psk", password,
+        "ipv4.method", "auto",
+        "ipv6.method", "auto",
+    ])
+    if code != 0:
+        return code, output, error
+    return run(["nmcli", "--wait", "90", "connection", "up", "id", profile], timeout=100)
+
+
 def connect_wifi(ssid, password):
     if not ssid or len(ssid.encode("utf-8")) > 32 or "\x00" in ssid or "\x00" in password:
         return 400, {"ok": False, "error": "Choose a valid Wi-Fi network."}
@@ -88,6 +124,9 @@ def connect_wifi(ssid, password):
     if password:
         command.extend(["password", password])
     code, output, error = run(command, timeout=100)
+    failure = (error or output).lower()
+    if code != 0 and password and "key-mgmt" in failure and "property is missing" in failure:
+        code, output, error = repair_wifi_profile(ssid, password)
     invalidate_network_health()
     if code != 0:
         detail = error or output or "NetworkManager could not join this network."

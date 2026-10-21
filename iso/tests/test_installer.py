@@ -46,6 +46,55 @@ class InstallerSafetyTests(unittest.TestCase):
         self.assertIn("NetworkManager not running", result["error"])
         self.assertEqual(runner.call_count, 2)
 
+    def test_wifi_repairs_profile_with_missing_key_management(self):
+        calls = [
+            (0, "", ""),
+            (0, "", ""),
+            (0, "", ""),
+            (10, "", "802-11-wireless-security.key-mgmt: property is missing"),
+            (0, "wlan0:802-11-wireless", ""),
+            (10, "", "unknown connection"),
+            (0, "Connection successfully added", ""),
+            (0, "Connection successfully activated", ""),
+        ]
+        with patch.object(SERVER, "run", side_effect=calls) as runner, patch.object(SERVER, "network_health", return_value={"online": True}):
+            status, result = SERVER.connect_wifi("Home Network", "secret123")
+        self.assertEqual(status, 200)
+        self.assertTrue(result["ok"])
+        self.assertIn(
+            call([
+                "nmcli", "connection", "add",
+                "type", "wifi",
+                "ifname", "wlan0",
+                "con-name", "A-OS Wi-Fi - Home Network",
+                "ssid", "Home Network",
+                "802-11-wireless-security.key-mgmt", "wpa-psk",
+                "802-11-wireless-security.psk", "secret123",
+                "ipv4.method", "auto",
+                "ipv6.method", "auto",
+            ]),
+            runner.call_args_list,
+        )
+        self.assertEqual(
+            runner.call_args,
+            call(["nmcli", "--wait", "90", "connection", "up", "id", "A-OS Wi-Fi - Home Network"], timeout=100),
+        )
+
+    def test_wifi_profile_repair_does_not_expose_password(self):
+        calls = [
+            (0, "", ""),
+            (0, "", ""),
+            (0, "", ""),
+            (10, "", "802-11-wireless-security.key-mgmt: property is missing"),
+            (0, "wlan0:wifi", ""),
+            (10, "", "unknown connection"),
+            (4, "", "Failed to save password secret123"),
+        ]
+        with patch.object(SERVER, "run", side_effect=calls):
+            status, result = SERVER.connect_wifi("Home", "secret123")
+        self.assertEqual(status, 400)
+        self.assertNotIn("secret123", result["error"])
+
     def test_disk_scan_does_not_request_unsupported_partn_column(self):
         output = '{"blockdevices":[{"path":"/dev/nvme0n1","type":"disk","children":[{"path":"/dev/nvme0n1p3","type":"part"}]}]}'
         with patch.object(SERVER, "run", return_value=(0, output, "")) as runner:

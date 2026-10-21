@@ -14,8 +14,10 @@ APT may need Internet access to download systemd-timesyncd and dependencies.
 The in-app A-OS command window is not a Linux administrator terminal.
 Do not erase or reinstall the disk to apply this package.
 
-The package replaces the native A-OS hardware service and enables network
-clock synchronisation. It does not modify profiles, files or disk partitions.
+The package replaces the native A-OS hardware service, repairs incomplete
+NetworkManager Wi-Fi profiles that are missing their WPA key-management mode,
+and enables network clock synchronisation. It does not modify A-OS user
+profiles, personal files or disk partitions.
 After installing, use A-OS Updates for the matching website interface fixes.
 An already incorrect clock may need manual correction before HTTPS downloads
 work. Network time also needs access to an NTP server.

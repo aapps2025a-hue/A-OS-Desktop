@@ -249,7 +249,7 @@ jobs:
           fi
           gh release edit iso-v3.0.0 \
             --title "A-OS Desktop 3.0 bootable installer" \
-            --notes "A-OS Desktop 3.0 boots the packaged A-OS HTML, supports a full-disk UEFI installation with a universal fallback loader, keeps persistent files and settings, and includes NetworkManager Wi-Fi, improved BlueZ Bluetooth, Family Device, Python execution, and the A-OS command line. Publication requires both the USB image and a no-USB installed UEFI disk to boot in QEMU until A-OS HTML executes."
+            --notes "A-OS Desktop 3.0 boots the packaged A-OS HTML, supports a full-disk UEFI installation with a universal fallback loader, keeps persistent files and settings, and includes NetworkManager Wi-Fi with automatic repair for incomplete WPA profiles, improved BlueZ Bluetooth, Family Device, Python execution, and the A-OS command line. Publication requires both the USB image and a no-USB installed UEFI disk to boot in QEMU until A-OS HTML executes."
           gh release upload iso-v3.0.0 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
