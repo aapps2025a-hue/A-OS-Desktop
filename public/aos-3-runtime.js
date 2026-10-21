@@ -332,11 +332,16 @@
   }
 
   async function loginMember(member, password, status) {
-    if (await digest(password) !== member.passwordHash) throw new Error("The password is incorrect.");
+    var passwordKey = window.AOS_USER_PROFILES.passwordKey(member.name);
+    var savedPassword = localStorage.getItem(passwordKey);
+    if (savedPassword !== null ? password !== savedPassword : await digest(password) !== member.passwordHash) throw new Error("The password is incorrect.");
+    var firstLogin = localStorage.getItem("aos-profile-workspace-" + encodeURIComponent(member.name)) === null;
+    if (savedPassword === null) localStorage.setItem(passwordKey, password);
+    window.AOS_USER_PROFILES.activate({name: member.name, email: member.email || ""}, false);
     localStorage.setItem(ACTIVE_MEMBER_KEY, JSON.stringify({id: member.id, name: member.name, ageGroup: member.ageGroup, signedInAt: Date.now()}));
     localStorage.setItem("aos-profile", member.name);
     localStorage.setItem("aos-configured", "true");
-    if (member.ageGroup === "7-") localStorage.setItem("aos-wallpaper", "Family Home.png");
+    if (firstLogin && member.ageGroup === "7-") localStorage.setItem("aos-wallpaper", "Family Home.png");
     var value = state();
     value.logins = [{memberId: member.id, name: member.name, at: Date.now()}].concat(value.logins || []).slice(0, 50);
     save(value);

@@ -4,6 +4,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock, Thread, Timer
 from urllib.request import Request, urlopen
+from urllib.error import URLError, HTTPError
 import hashlib
 import json
 import math
@@ -11,6 +12,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import tarfile
 import tempfile
@@ -69,6 +71,30 @@ def run(command, timeout=COMMAND_TIMEOUT, input_text=None):
         return result.returncode, result.stdout.strip(), result.stderr.strip()
     except (FileNotFoundError, subprocess.TimeoutExpired) as error:
         return 127, "", str(error)
+
+
+def connect_wifi(ssid, password):
+    if not ssid or len(ssid.encode("utf-8")) > 32 or "\x00" in ssid or "\x00" in password:
+        return 400, {"ok": False, "error": "Choose a valid Wi-Fi network."}
+    run(["rfkill", "unblock", "wifi"])
+    for command in (["nmcli", "networking", "on"], ["nmcli", "radio", "wifi", "on"]):
+        code, output, error = run(command)
+        if code != 0:
+            detail = error or output or "NetworkManager is unavailable."
+            if password:
+                detail = detail.replace(password, "[hidden]")
+            return 400, {"ok": False, "error": "Wi-Fi could not be enabled: " + detail}
+    command = ["nmcli", "--wait", "90", "device", "wifi", "connect", ssid]
+    if password:
+        command.extend(["password", password])
+    code, output, error = run(command, timeout=100)
+    invalidate_network_health()
+    if code != 0:
+        detail = error or output or "NetworkManager could not join this network."
+        if password:
+            detail = detail.replace(password, "[hidden]")
+        return 400, {"ok": False, "error": "Wi-Fi connection failed: " + detail}
+    return 200, {"ok": True, "message": "Connected to Wi-Fi.", "connectivity": network_health(force=True)}
 
 
 def require_command(command, timeout=COMMAND_TIMEOUT, input_text=None):
@@ -307,9 +333,11 @@ def network_health(force=False):
         "online": False,
         "dns": False,
         "checked": True,
+        "failure": "disabled",
         "message": "Internet access is off",
     }
     if networking_enabled():
+        result["failure"] = "dns"
         result["message"] = "Connected to a network, checking Internet access"
         try:
             socket.getaddrinfo("a-os-desktop.web.app", 443, type=socket.SOCK_STREAM)
@@ -317,13 +345,26 @@ def network_health(force=False):
         except OSError:
             result["message"] = "Connected, but DNS is not responding"
         if result["dns"]:
+            result["failure"] = "connection"
             try:
                 request = Request(REMOTE_VERSION_URL, method="HEAD", headers={"User-Agent": "A-OS/3.0"})
-                with urlopen(request, timeout=5) as response:
+                with urlopen(request, timeout=15) as response:
                     result["online"] = 200 <= int(response.status) < 500
+                result["failure"] = "" if result["online"] else "http"
                 result["message"] = "Internet connection is working" if result["online"] else "The Internet check was rejected"
-            except Exception:
-                result["message"] = "Connected, but the Internet is not responding"
+            except HTTPError as error:
+                result["failure"] = "http"
+                result["message"] = "The connection reached the update server, but it returned HTTP " + str(error.code)
+            except (URLError, OSError) as error:
+                reason = getattr(error, "reason", error)
+                if isinstance(reason, ssl.SSLCertVerificationError):
+                    result["failure"] = "certificate"
+                    result["message"] = "Secure connection failed: check the system date and time and the network's certificates."
+                elif isinstance(reason, (TimeoutError, socket.timeout)):
+                    result["failure"] = "timeout"
+                    result["message"] = "Internet check timed out. The connection may be slow or blocked."
+                else:
+                    result["message"] = "Internet connection failed: " + str(reason)[:240]
 
     with NETWORK_HEALTH_LOCK:
         NETWORK_HEALTH_CACHE["at"] = time.monotonic()
@@ -1442,19 +1483,8 @@ class AosHandler(SimpleHTTPRequestHandler):
             self._json(200 if code == 0 else 500, {"ok": code == 0, "enabled": enabled, "error": error})
             return
         if route == "/__aos/wifi/connect":
-            ssid, password = str(body.get("ssid") or "")[:128], str(body.get("password") or "")[:256]
-            if not ssid:
-                self._json(400, {"ok": False, "error": "Choose a Wi-Fi network"})
-                return
-            if not networking_enabled():
-                run(["nmcli", "networking", "on"])
-            command = ["nmcli", "device", "wifi", "connect", ssid]
-            if password:
-                command.extend(["password", password])
-            code, output, error = run(command, timeout=35)
-            invalidate_network_health()
-            health = network_health(force=True) if code == 0 else None
-            self._json(200 if code == 0 else 400, {"ok": code == 0, "message": output, "error": error, "connectivity": health})
+            status, result = connect_wifi(str(body.get("ssid") or ""), str(body.get("password") or ""))
+            self._json(status, result)
             return
         if route == "/__aos/bluetooth/toggle":
             enabled = bool(body.get("enabled"))

@@ -1,0 +1,10 @@
+Package: aos-network-repair
+Version: 3.0.0-20261021
+Architecture: all
+Maintainer: A-OS Project
+Depends: python3, network-manager, systemd-timesyncd, ca-certificates, rfkill
+Section: admin
+Priority: optional
+Description: A-OS native network and clock synchronisation repair
+ Updates the existing A-OS hardware service without changing user profiles,
+ partitions, installed applications or personal files.

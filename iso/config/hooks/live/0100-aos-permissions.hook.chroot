@@ -8,6 +8,7 @@ chmod 0755 /etc/skel/.xinitrc
 systemctl enable aos-web.service
 systemctl enable aos-session.service
 systemctl enable NetworkManager.service
+systemctl enable systemd-timesyncd.service
 systemctl enable aos-network-ready.service
 systemctl enable bluetooth.service
 systemctl disable NetworkManager-wait-online.service 2>/dev/null || true

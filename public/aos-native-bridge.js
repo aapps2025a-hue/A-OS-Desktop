@@ -143,8 +143,7 @@
     connect: function (ssid, password) {
       return post("/__aos/wifi/connect", {ssid: ssid, password: password || ""})
         .then(function () { return refreshSystem(); })
-        .then(function () { return true; })
-        .catch(function () { return false; });
+        .then(function () { return true; });
     },
     toggle: function (enabled) {
       return post("/__aos/wifi/toggle", {enabled: Boolean(enabled)}).then(refreshSystem);

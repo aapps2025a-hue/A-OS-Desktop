@@ -125,19 +125,25 @@
     password.placeholder = item.secure ? "Wi-Fi password" : "Open network";
     password.autocomplete = "current-password";
     password.disabled = !item.secure || item.connected;
+    var connectionStatus = element("small", "aos-native-wifi-status", "");
+    connectionStatus.setAttribute("role", "status");
+    connectionStatus.setAttribute("aria-live", "polite");
+    details.appendChild(connectionStatus);
     var connect = element("button", item.connected ? "" : "primary", item.connected ? "Connected" : "Connect");
     connect.type = "button";
     connect.disabled = Boolean(item.connected);
     connect.addEventListener("click", function () {
       connect.disabled = true;
       connect.textContent = "Connecting";
-      window.aosNetworkBridge.connect(item.ssid, password.value).then(function (ok) {
+      connectionStatus.textContent = "Connecting to " + item.ssid + "...";
+      Promise.resolve().then(function () { return window.aosNetworkBridge.connect(item.ssid, password.value); }).then(function (ok) {
         if (!ok) throw new Error("A-OS could not connect to " + item.ssid + ".");
         notify("Connected to " + item.ssid + ".");
         renderPanel();
       }).catch(function (error) {
         connect.disabled = false;
         connect.textContent = "Connect";
+        connectionStatus.textContent = error && error.message ? error.message : "Connection failed. Try again.";
         nativeError(error);
       });
     });
@@ -401,19 +407,6 @@
   }
 
   function wireQuickSettings() {
-    document.querySelectorAll(".quick-tiles button").forEach(function (button) {
-      if (button.dataset.aosNativeControl) return;
-      var label = button.querySelector("b");
-      if (!label) return;
-      var name = label.textContent.trim();
-      if (name !== "Wi-Fi" && name !== "Bluetooth") return;
-      button.dataset.aosNativeControl = "true";
-      button.addEventListener("click", function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        openPanel(name === "Wi-Fi" ? "wifi" : "bluetooth");
-      }, true);
-    });
     updateQuickSettings(window.AOS_NATIVE_BRIDGE.state || {});
   }
 
@@ -608,6 +601,16 @@
   document.addEventListener("click", function (event) {
     var button = event.target && event.target.closest && event.target.closest("button");
     if (!button || button.closest(".aos-native-panel")) return;
+    if (button.closest(".quick-tiles")) {
+      var heading = button.querySelector("b");
+      var control = heading && heading.textContent.trim();
+      if (control === "Wi-Fi" || control === "Bluetooth") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openPanel(control === "Wi-Fi" ? "wifi" : "bluetooth");
+        return;
+      }
+    }
     var label = (button.getAttribute("aria-label") || button.title || button.textContent || "").trim().toLowerCase();
     if (/^(restart|shut down|shutdown|hibernate)$/.test(label)) {
       event.preventDefault();

@@ -220,6 +220,13 @@ jobs:
       - name: Create checksum
         run: sha256sum A-OS-Desktop-amd64.iso > A-OS-Desktop-amd64.iso.sha256
 
+      - name: Package repair for existing A-OS installations
+        run: |
+          sh iso/build-network-repair.sh
+          dpkg-deb --info A-OS-Network-Repair-20261021.deb
+          sha256sum A-OS-Network-Repair-20261021.deb > A-OS-Network-Repair-20261021.deb.sha256
+          cp iso/repair/README.txt A-OS-Network-Repair-README.txt
+
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
@@ -227,6 +234,9 @@ jobs:
           path: |
             A-OS-Desktop-amd64.iso
             A-OS-Desktop-amd64.iso.sha256
+            A-OS-Network-Repair-20261021.deb
+            A-OS-Network-Repair-20261021.deb.sha256
+            A-OS-Network-Repair-README.txt
           retention-days: 30
 
       - name: Publish ISO release
@@ -243,4 +253,7 @@ jobs:
           gh release upload iso-v3.0.0 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
+            A-OS-Network-Repair-20261021.deb \
+            A-OS-Network-Repair-20261021.deb.sha256 \
+            A-OS-Network-Repair-README.txt \
             --clobber

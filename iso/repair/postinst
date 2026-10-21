@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "${1:-}" = configure ] && [ -d /run/systemd/system ]; then
+  systemctl enable --now systemd-timesyncd.service
+  timedatectl set-ntp true
+  systemctl try-restart aos-web.service
+fi

@@ -107,6 +107,31 @@ async function main() {
   await cdp.send("Runtime.enable");
   await cdp.send("Page.navigate", { url });
   await waitFor("document.readyState === 'complete'", "the initial page");
+  if (process.env.AOS_WIFI_SMOKE === "1") {
+    await evaluate(`(async () => {
+      window.AOS_NATIVE_BRIDGE = {state:{wifi:{enabled:true}}, refresh:async()=>({wifi:{enabled:true}})};
+      window.aosNetworkBridge = {
+        scan: async()=>[{ssid:"Test Network",secure:true,strength:80}],
+        connect: async()=>{throw new Error("No Wi-Fi adapter available (test)");}
+      };
+      await new Promise((resolve,reject)=>{
+        const script=document.createElement("script");script.src="./aos-live-native-runtime.js?wifi-test=1";
+        script.onload=resolve;script.onerror=reject;document.body.appendChild(script);
+      });
+      const tiles=document.createElement("div");tiles.className="quick-tiles";
+      tiles.innerHTML="<button><b>Wi-Fi</b></button>";
+      document.body.appendChild(tiles);
+      tiles.querySelector("button").click();
+    })()`);
+    await waitFor(`Boolean(document.querySelector('.aos-native-device input'))`, "Wi-Fi panel from immediate Quick Settings click");
+    await evaluate(`document.querySelector('.aos-native-device button').click()`);
+    await waitFor(`document.querySelector('.aos-native-wifi-status').textContent.includes('No Wi-Fi adapter available')`, "visible connection error");
+    await evaluate(`window.aosNetworkBridge.connect=async()=>true;document.querySelector('.aos-native-device button').click()`);
+    await waitFor(`Boolean(document.querySelector('.aos-native-device button')) && !document.querySelector('.aos-native-device button').disabled`, "connection retry completing");
+    console.log("PASS: immediate Quick Settings click opens Wi-Fi, failed connections show inline errors, retry completes");
+    cdp.socket.close();
+    return;
+  }
   await waitFor(
     `(() => { try { localStorage.getItem("aos-configured"); return location.origin === ${JSON.stringify(new URL(url).origin)}; } catch (_) { return false; } })()`,
     "A-OS origin storage"
@@ -115,6 +140,8 @@ async function main() {
     localStorage.setItem("aos-configured", "true");
     localStorage.setItem("aos-no-locking", "true");
     localStorage.setItem("aos-profile", "Person");
+    localStorage.setItem("aos-profile-password-Person", "AosTest123!");
+    localStorage.setItem("aos-password", "AosTest123!");
     localStorage.setItem("aos-username", "ISO App Test");
     localStorage.setItem("aos-files", JSON.stringify([{
       id: "smoke-iso",
@@ -152,6 +179,49 @@ async function main() {
     await sleep(250);
   }
   await waitFor(`${appButton("Files")} != null`, "the A-OS desktop", 1000);
+
+  if (process.env.AOS_PROFILE_SMOKE === "1") {
+    const result = await evaluate(`(() => {
+      const api = window.AOS_USER_PROFILES;
+      localStorage.setItem("aos-wallpaper", "Porto.png");
+      localStorage.setItem("aos-shelf-position", "left");
+      localStorage.setItem(api.passwordKey("Second User"), "SecondPassword!");
+      api.activate({name:"Second User"}, true);
+      if (localStorage.getItem("aos-password") !== "SecondPassword!") throw Error("Wrong second password");
+      if (localStorage.getItem("aos-wallpaper") !== null) throw Error("Inherited wallpaper");
+      localStorage.setItem("aos-wallpaper", "Faro.jpg");
+      localStorage.setItem("aos-shelf-position", "right");
+      api.activate({name:"Person"});
+      if (localStorage.getItem("aos-password") !== "AosTest123!") throw Error("Wrong first password");
+      if (localStorage.getItem("aos-wallpaper") !== "Porto.png") throw Error("Lost first wallpaper");
+      if (localStorage.getItem("aos-shelf-position") !== "left") throw Error("Lost taskbar position");
+      return true;
+    })()`);
+    if (!result) throw new Error("Profile switch failed");
+    await evaluate("location.reload()");
+    await waitFor(`Boolean(document.querySelector('input[type="password"]'))`, "password prompt after reload");
+    const enterPassword = async (password) => evaluate(`(() => {
+      const input = document.querySelector('input[type="password"]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, ${JSON.stringify(password)});
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+      input.dispatchEvent(new Event("change", {bubbles:true}));
+      const form = input.closest("form");
+      form.requestSubmit();
+    })()`);
+    await enterPassword("SecondPassword!");
+    await sleep(500);
+    if (await evaluate(`Boolean(document.querySelector('.shelf'))`)) throw new Error("Another user's password unlocked this profile");
+    await enterPassword("AosTest123!");
+    await waitFor(`localStorage.getItem("aos-wallpaper") === "Porto.png" && Boolean(document.querySelector('.shelf'))`, "saved desktop after reload");
+    const images = await evaluate(`Promise.all(["Porto.png","Faro.jpg"].map(name => new Promise(resolve => {
+      const img = new Image(); img.onload = () => resolve(img.naturalWidth >= 1280); img.onerror = () => resolve(false);
+      img.src = './assets/backgrounds/' + name;
+    })))`);
+    if (images.some(value => !value)) throw new Error("Photographic wallpaper failed to load");
+    console.log("PASS: Chrome desktop boots, switches profiles, reloads saved settings and loads both photographs");
+    cdp.socket.close();
+    return;
+  }
 
   if (nativeIso) {
     await evaluate(`document.querySelector(".shelf button.status").click()`);

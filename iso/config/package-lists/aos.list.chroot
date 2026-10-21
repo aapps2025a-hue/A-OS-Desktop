@@ -1,6 +1,7 @@
 live-boot
 live-config
 systemd-sysv
+systemd-timesyncd
 linux-image-amd64
 xserver-xorg
 xserver-xorg-legacy

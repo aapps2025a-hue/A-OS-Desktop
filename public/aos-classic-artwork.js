@@ -2,7 +2,7 @@
   "use strict";
 
   var RESTORE_VERSION = "2026-10-17-classic-4";
-  var ASSET_VERSION = "20261017-classic4";
+  var ASSET_VERSION = "20261021-photos1";
   var VERSION_KEY = "aos-classic-artwork-version";
   var BACKUP_KEY = "aos-classic-artwork-backup";
 
@@ -29,7 +29,7 @@
     var workspace = readJson(localStorage.getItem(key), null);
     if (!workspace || typeof workspace !== "object") return;
 
-    workspace["aos-wallpaper"] = "Aqua A (Default).png";
+    if (!workspace["aos-wallpaper"]) workspace["aos-wallpaper"] = "Aqua A (Default).png";
     workspace["aos-icon-pack"] = "{}";
     if (workspace["aos-app-overrides"] !== undefined) {
       workspace["aos-app-overrides"] = JSON.stringify(restoreAppOverrides(workspace["aos-app-overrides"]));
@@ -52,7 +52,7 @@
       }));
     }
 
-    localStorage.setItem("aos-wallpaper", "Aqua A (Default).png");
+    if (!localStorage.getItem("aos-wallpaper")) localStorage.setItem("aos-wallpaper", "Aqua A (Default).png");
     localStorage.setItem("aos-icon-pack", "{}");
 
     var appOverridesValue = localStorage.getItem("aos-app-overrides");

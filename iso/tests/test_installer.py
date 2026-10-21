@@ -17,6 +17,35 @@ os.chdir(ORIGINAL_DIRECTORY)
 
 
 class InstallerSafetyTests(unittest.TestCase):
+    def test_wifi_preserves_password_and_allows_full_connection_timeout(self):
+        password = '  special!$ password  '
+        with patch.object(SERVER, "run", return_value=(0, "", "")) as runner, patch.object(SERVER, "network_health", return_value={"online": True}):
+            status, result = SERVER.connect_wifi("Home Network", password)
+        self.assertEqual(status, 200)
+        self.assertTrue(result["ok"])
+        self.assertEqual(runner.call_args, call(["nmcli", "--wait", "90", "device", "wifi", "connect", "Home Network", "password", password], timeout=100))
+        self.assertIn(call(["nmcli", "radio", "wifi", "on"]), runner.call_args_list)
+
+    def test_wifi_reports_adapter_failure_without_blaming_password(self):
+        with patch.object(SERVER, "run", side_effect=[(0,"",""), (0,"",""), (0,"",""), (10,"","No Wi-Fi device found")]):
+            status, result = SERVER.connect_wifi("Home", "secret123")
+        self.assertEqual(status, 400)
+        self.assertIn("No Wi-Fi device found", result["error"])
+        self.assertNotIn("Incorrect", result["error"])
+
+    def test_wifi_timeout_error_does_not_expose_password(self):
+        with patch.object(SERVER, "run", side_effect=[(0,"",""), (0,"",""), (0,"",""), (127,"","Command password secret123 timed out")]):
+            _, result = SERVER.connect_wifi("Home", "secret123")
+        self.assertNotIn("secret123", result["error"])
+        self.assertIn("timed out", result["error"])
+
+    def test_wifi_enable_failure_stops_before_connection(self):
+        with patch.object(SERVER, "run", side_effect=[(0,"",""), (1,"","NetworkManager not running")]) as runner:
+            status, result = SERVER.connect_wifi("Home", "secret123")
+        self.assertEqual(status, 400)
+        self.assertIn("NetworkManager not running", result["error"])
+        self.assertEqual(runner.call_count, 2)
+
     def test_disk_scan_does_not_request_unsupported_partn_column(self):
         output = '{"blockdevices":[{"path":"/dev/nvme0n1","type":"disk","children":[{"path":"/dev/nvme0n1p3","type":"part"}]}]}'
         with patch.object(SERVER, "run", return_value=(0, output, "")) as runner:
@@ -338,6 +367,32 @@ Boot0007* A-OS
         self.assertTrue(health["online"])
         self.assertTrue(health["dns"])
         self.assertEqual(health["message"], "Internet connection is working")
+
+    def test_network_health_identifies_certificate_errors(self):
+        error = SERVER.URLError(SERVER.ssl.SSLCertVerificationError(1, "certificate is not yet valid"))
+        with patch.object(SERVER, "networking_enabled", return_value=True), patch.object(SERVER.socket, "getaddrinfo", return_value=[]), patch.object(SERVER, "urlopen", side_effect=error):
+            health = SERVER.network_health(force=True)
+        self.assertEqual(health["failure"], "certificate")
+        self.assertIn("date and time", health["message"])
+        self.assertFalse(health["online"])
+
+    def test_network_health_identifies_timeouts(self):
+        with patch.object(SERVER, "networking_enabled", return_value=True), patch.object(SERVER.socket, "getaddrinfo", return_value=[]), patch.object(SERVER, "urlopen", side_effect=SERVER.URLError(TimeoutError())):
+            health = SERVER.network_health(force=True)
+        self.assertEqual(health["failure"], "timeout")
+        self.assertFalse(health["online"])
+
+    def test_network_health_identifies_dns_failure(self):
+        with patch.object(SERVER, "networking_enabled", return_value=True), patch.object(SERVER.socket, "getaddrinfo", side_effect=OSError("DNS unavailable")), patch.object(SERVER, "urlopen") as request:
+            health = SERVER.network_health(force=True)
+        self.assertEqual(health["failure"], "dns")
+        request.assert_not_called()
+
+    def test_iso_includes_and_enables_network_clock_sync(self):
+        config = REPOSITORY / "iso/config"
+        self.assertIn("systemd-timesyncd", (config / "package-lists/aos.list.chroot").read_text())
+        self.assertIn("systemctl enable systemd-timesyncd.service", (config / "hooks/live/0100-aos-permissions.hook.chroot").read_text())
+        self.assertIn("timedatectl set-ntp true", (config / "includes.chroot/usr/local/lib/aos/network-ready.sh").read_text())
 
     def test_volume_state_reads_pipewire_default_sink(self):
         with patch.object(SERVER, "run_as_aos", return_value=(0, "Volume: 0.65 [MUTED]", "")):

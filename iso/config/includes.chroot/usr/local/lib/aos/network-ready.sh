@@ -7,6 +7,9 @@ set -u
 rfkill unblock wifi >/dev/null 2>&1 || true
 nmcli networking on >/dev/null 2>&1 || true
 nmcli radio wifi on >/dev/null 2>&1 || true
+# Keep HTTPS working when the hardware clock is wrong. The service retries
+# when a connection becomes available, including Wi-Fi joined after setup.
+timedatectl set-ntp true >/dev/null 2>&1 || true
 
 nmcli -t -f DEVICE,TYPE device status 2>/dev/null | while IFS=: read -r device kind; do
   case "$kind" in
