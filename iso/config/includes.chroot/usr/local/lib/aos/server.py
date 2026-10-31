@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Lock, Thread, Timer
 from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlparse
 import hashlib
 import json
 import math
@@ -210,6 +211,69 @@ def run_as_aos(command, timeout=COMMAND_TIMEOUT):
         "runuser", "-u", "aos", "--", "env", "XDG_RUNTIME_DIR=/run/user/" + uid,
         *command,
     ], timeout=timeout)
+
+
+def normalize_browser_url(value):
+    address = str(value or "").strip()
+    if not address or len(address) > 4096 or any(ord(character) < 32 for character in address):
+        raise RuntimeError("Enter a valid website address")
+    if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*:", address) and not re.match(r"^https?://", address, re.IGNORECASE):
+        raise RuntimeError("Only HTTP and HTTPS websites can open in OSInternet")
+    if not re.match(r"^https?://", address, re.IGNORECASE):
+        address = "https://" + address
+    try:
+        parsed = urlparse(address)
+        hostname = parsed.hostname
+        parsed.port
+    except ValueError as error:
+        raise RuntimeError("Enter a valid website address") from error
+    if parsed.scheme.lower() not in {"http", "https"} or not hostname:
+        raise RuntimeError("Only HTTP and HTTPS websites can open in OSInternet")
+    if parsed.username is not None or parsed.password is not None:
+        raise RuntimeError("Website addresses cannot contain account credentials")
+    return address
+
+
+def open_native_browser(value):
+    address = normalize_browser_url(value)
+    profile = STATE_ROOT / "direct-browser-profile"
+    cache = STATE_ROOT / "direct-browser-cache"
+    code, uid, error = run(["id", "-u", "aos"], timeout=2)
+    if code != 0 or not uid.isdigit():
+        raise RuntimeError(error or "The A-OS desktop session is unavailable")
+    code, _, error = run([
+        "install", "-d", "-o", "aos", "-g", "aos", "-m", "0700", str(profile), str(cache),
+    ], timeout=4)
+    if code != 0:
+        raise RuntimeError(error or "A-OS could not prepare the secure browser profile")
+    command = [
+        "runuser", "-u", "aos", "--", "env",
+        "DISPLAY=:0",
+        "HOME=/home/aos",
+        "XDG_RUNTIME_DIR=/run/user/" + uid,
+        "XAUTHORITY=/home/aos/.Xauthority",
+        "chromium",
+        "--new-window",
+        "--start-maximized",
+        "--app=" + address,
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--noerrdialogs",
+        "--password-store=basic",
+        "--user-data-dir=" + str(profile),
+        "--disk-cache-dir=" + str(cache),
+    ]
+    try:
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env={**os.environ, "LC_ALL": "C.UTF-8"},
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise RuntimeError("A-OS could not open the secure browser") from error
+    return address
 
 
 def volume_state():
@@ -1539,6 +1603,13 @@ class AosHandler(SimpleHTTPRequestHandler):
         body = self._body()
         if body is None:
             self._json(400, {"ok": False, "error": "Invalid JSON"})
+            return
+        if route == "/__aos/browser/open":
+            try:
+                address = open_native_browser(body.get("url"))
+                self._json(200, {"ok": True, "url": address})
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
             return
         if route == "/__aos/networking/toggle":
             enabled = bool(body.get("enabled"))

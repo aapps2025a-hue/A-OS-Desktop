@@ -483,6 +483,36 @@ Boot0007* A-OS
         self.assertIn("/a-os.html?aosLiveIso=1", script)
         self.assertNotIn("/index.html?aosLiveIso=1", script)
 
+    def test_secure_browser_accepts_web_addresses_and_rejects_unsafe_schemes(self):
+        self.assertEqual(SERVER.normalize_browser_url("accounts.google.com"), "https://accounts.google.com")
+        self.assertEqual(SERVER.normalize_browser_url("https://example.com/sign-in"), "https://example.com/sign-in")
+        with self.assertRaisesRegex(RuntimeError, "HTTP and HTTPS"):
+            SERVER.normalize_browser_url("javascript:alert(1)")
+        with self.assertRaisesRegex(RuntimeError, "credentials"):
+            SERVER.normalize_browser_url("https://user:secret@example.com")
+
+    def test_secure_browser_uses_a_separate_persistent_profile(self):
+        original_state_root = SERVER.STATE_ROOT
+        with TemporaryDirectory() as directory:
+            SERVER.STATE_ROOT = Path(directory)
+            try:
+                with patch.object(SERVER, "run", side_effect=[(0, "1000", ""), (0, "", "")]), patch.object(SERVER.subprocess, "Popen") as launcher:
+                    address = SERVER.open_native_browser("https://accounts.google.com")
+            finally:
+                SERVER.STATE_ROOT = original_state_root
+        self.assertEqual(address, "https://accounts.google.com")
+        command = launcher.call_args.args[0]
+        self.assertIn("--app=https://accounts.google.com", command)
+        self.assertTrue(any(value.startswith("--user-data-dir=") and "direct-browser-profile" in value for value in command))
+        self.assertTrue(launcher.call_args.kwargs["start_new_session"])
+
+    def test_iso_browser_allows_popups_and_exposes_secure_sign_in(self):
+        runtime = (REPOSITORY / "public/aos-live-native-runtime.js").read_text(encoding="utf-8")
+        bridge = (REPOSITORY / "public/aos-native-bridge.js").read_text(encoding="utf-8")
+        self.assertIn('"allow-popups-to-escape-sandbox"', runtime)
+        self.assertIn('"/__aos/browser/open"', bridge)
+        self.assertIn('"Sign in"', runtime)
+
     def test_update_archive_stages_and_atomically_installs_native_service(self):
         source = SERVER_PATH.read_bytes()
         with TemporaryDirectory() as directory:

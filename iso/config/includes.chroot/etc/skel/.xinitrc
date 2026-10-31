@@ -62,11 +62,9 @@ while true; do
     --disable-search-engine-choice-screen \
     --disable-dev-shm-usage \
     --disable-translate \
-    --disable-background-networking \
     --disable-component-update \
-    --disable-sync \
     --disable-breakpad \
-    --disable-features=Translate,MediaRouter,ChromeWhatsNewUI,SidePanelPinning,OptimizationHints,AutofillServerCommunication \
+    --disable-features=Translate,MediaRouter,ChromeWhatsNewUI,SidePanelPinning,OptimizationHints \
     --no-service-autorun \
     --autoplay-policy=no-user-gesture-required \
     --password-store=basic \

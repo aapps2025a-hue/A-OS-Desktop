@@ -546,6 +546,16 @@
   object-fit: contain;
 }
 
+.aos-native-browser-signin {
+  flex: 0 0 auto;
+  min-width: 58px;
+  height: 36px;
+  padding: 0 10px !important;
+  white-space: nowrap;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+
 .aos-native-browser-menu {
   position: absolute;
   z-index: 50;

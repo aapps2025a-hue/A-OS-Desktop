@@ -440,6 +440,13 @@
     });
     frame.setAttribute("allow", permissions.join("; "));
     frame.setAttribute("allowfullscreen", "");
+    if (frame.hasAttribute("sandbox")) {
+      var sandbox = (frame.getAttribute("sandbox") || "").split(/\s+/).filter(Boolean);
+      ["allow-popups", "allow-popups-to-escape-sandbox"].forEach(function (token) {
+        if (sandbox.indexOf(token) === -1) sandbox.push(token);
+      });
+      frame.setAttribute("sandbox", sandbox.join(" "));
+    }
 
     function install() {
       try {
@@ -471,6 +478,24 @@
     install();
   }
 
+  function openSecureBrowser(browser) {
+    var input = browser && browser.querySelector(".browser-address input");
+    var address = input && input.value ? input.value.trim() : "";
+    if (!address) {
+      notify("Open a website first, then choose Sign in.");
+      return;
+    }
+    if (!window.aosBrowserBridge || typeof window.aosBrowserBridge.open !== "function") {
+      notify("Secure sign-in is only available in the installed A-OS browser.");
+      return;
+    }
+    window.aosBrowserBridge.open(address).then(function () {
+      notify("Opened a secure browser window. Your sign-in will be saved on this device.");
+    }).catch(function (error) {
+      notify(error && error.message ? error.message : "A-OS could not open the secure browser.");
+    });
+  }
+
   function browserMenu(browser) {
     if (!browser || browser.dataset.aosNativeMenu === "ready") return;
     var toolbar = browser.querySelector(".browser-toolbar");
@@ -487,6 +512,11 @@
     emoji.addEventListener("click", function () {
       window.dispatchEvent(new CustomEvent("aos-open-quick-palette", {detail: {tab: "emoji"}}));
     });
+    var signIn = element("button", "aos-native-browser-signin", "Sign in");
+    signIn.type = "button";
+    signIn.title = "Open this website securely for Google sign-in";
+    signIn.setAttribute("aria-label", "Open this website securely for sign-in");
+    signIn.addEventListener("click", function () { openSecureBrowser(browser); });
     var trigger = element("button", "aos-native-browser-menu-button", "\u22ee");
     trigger.type = "button";
     trigger.title = "More browser options";
@@ -498,6 +528,7 @@
         var input = toolbar.querySelector(".browser-address input");
         if (input && navigator.clipboard) navigator.clipboard.writeText(input.value).then(function () { notify("Address copied."); });
       }],
+      ["Open for Google sign-in", function () { openSecureBrowser(browser); }],
       ["Open full screen", function () {
         if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(function () {});
         else document.exitFullscreen().catch(function () {});
@@ -523,7 +554,7 @@
       menu.appendChild(action);
     });
     trigger.addEventListener("click", function () { menu.hidden = !menu.hidden; });
-    toolbar.append(emoji, trigger);
+    toolbar.append(emoji, signIn, trigger);
     browser.appendChild(menu);
   }
 

@@ -136,6 +136,12 @@
     get state() { return systemState; }
   };
 
+  window.aosBrowserBridge = {
+    open: function (url) {
+      return post("/__aos/browser/open", {url: String(url || "")});
+    }
+  };
+
   window.aosNetworkBridge = {
     scan: function () {
       return request("/__aos/wifi/scan").then(function (value) { return value.networks || []; });
