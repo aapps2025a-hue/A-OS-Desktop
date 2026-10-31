@@ -4,14 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A-OS 3.0</title>
-    <meta name="description" content="Download the bootable A-OS Desktop 3.0 installer ISO and learn how it installs to a UEFI computer.">
+    <meta name="description" content="Download the bootable A-OS Desktop 3.0 installer ISO or install A-Store on Android.">
     <link rel="icon" href="./assets/icons/OS Logo.png" type="image/png">
-    <link rel="stylesheet" href="./download.css?v=20261020-aos3">
+    <link rel="stylesheet" href="./download.css?v=20261031-astore-android">
+    <style>
+      .android-download { background: #eaf7fc; }
+      .section-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 24px; }
+      .section-actions a { display: inline-block; border: 1px solid #0784c3; border-radius: 6px; padding: 12px 17px; font-weight: 800; }
+      .section-actions .primary { color: #fff; background: #0784c3; }
+      .section-actions span { color: #5c7180; font-size: 14px; }
+      .checksum { max-width: 1040px; margin: 26px auto 0; color: #5c7180; font-size: 12px; line-height: 1.6; }
+      .checksum code { overflow-wrap: anywhere; }
+      @media (max-width: 520px) {
+        nav > div { display: block; }
+        nav > div a { display: none; }
+        nav > div a[href="#android"] { display: block; }
+      }
+    </style>
   </head>
   <body>
     <nav>
       <a class="brand" href="./"><img src="./assets/icons/OS Logo.png" alt=""><span>A-OS</span></a>
-      <div><a href="#install">Installation</a><a href="#repair">Repair</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
+      <div><a href="#install">Installation</a><a href="#android">Android</a><a href="#repair">Repair</a><a href="#about">About</a><a href="https://github.com/aapps2025a-hue/A-OS-Desktop">Source</a></div>
     </nav>
     <main>
       <section class="hero">
@@ -21,6 +35,7 @@
           <span>A bootable desktop with persistent files, hardware controls, Family Device, A-Store and A-AI.</span>
           <div class="actions">
             <a class="primary" href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Desktop-amd64.iso">Download ISO</a>
+            <a href="./downloads/A-Store-Android.apk" download="A-Store-Android.apk">Download A-Store APK</a>
             <a href="https://github.com/aapps2025a-hue/A-OS-Desktop/releases/download/iso-v3.0.0/A-OS-Network-Repair-20261021.deb">Repair installed A-OS</a>
             <a href="./">Try A-OS</a>
           </div>
@@ -35,6 +50,23 @@
           <li><b>Choose a disk</b><span>Install beside Windows in unallocated space, or erase a selected empty disk.</span></li>
           <li><b>Finish installation</b><span>Wait for the completed message, remove the USB, and restart into A-OS.</span></li>
         </ol>
+      </section>
+      <section class="install android-download" id="android">
+        <header>
+          <p>A-Store for Android</p>
+          <h2>Install A-Store on your phone or tablet</h2>
+          <div class="section-actions">
+            <a class="primary" href="./downloads/A-Store-Android.apk" download="A-Store-Android.apk">Download APK</a>
+            <span>Version 1.1.0 · Android 7.0 or newer · 897 KB</span>
+          </div>
+        </header>
+        <ol>
+          <li><b>Download the APK</b><span>Tap Download APK and keep the A-Store package on your Android device.</span></li>
+          <li><b>Allow this source</b><span>If Android asks, allow your browser to install this one app package.</span></li>
+          <li><b>Install A-Store</b><span>Open A-Store-Android.apk and confirm Install. Existing A-Store data is kept during updates.</span></li>
+          <li><b>Open A-Store</b><span>Launch A-Store from your Android apps and install available A-Store apps.</span></li>
+        </ol>
+        <p class="checksum">SHA-256: <code>F33DA505050456F7EFBD5729FED12142780453ED8841D63F7FB8448EC3360F16</code></p>
       </section>
       <section class="install" id="repair">
         <header><p>Already installed</p><h2>Repair Wi-Fi without reinstalling</h2></header>
