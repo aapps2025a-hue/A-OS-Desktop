@@ -259,6 +259,7 @@ def open_native_browser(value):
         "--no-first-run",
         "--no-default-browser-check",
         "--noerrdialogs",
+        "--autoplay-policy=no-user-gesture-required",
         "--password-store=basic",
         "--user-data-dir=" + str(profile),
         "--disk-cache-dir=" + str(cache),
@@ -274,6 +275,74 @@ def open_native_browser(value):
     except OSError as error:
         raise RuntimeError("A-OS could not open the secure browser") from error
     return address
+
+
+def linux_applications():
+    applications = []
+    seen = set()
+    roots = [Path("/usr/share/applications"), Path("/home/aos/.local/share/applications")]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for desktop_file in sorted(root.glob("*.desktop")):
+            app_id = desktop_file.name[:-8]
+            if not re.fullmatch(r"[A-Za-z0-9._+-]+", app_id) or app_id in seen:
+                continue
+            try:
+                source = desktop_file.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            entry = source.split("[Desktop Entry]", 1)[-1].split("\n[", 1)[0]
+            values = {}
+            for line in entry.splitlines():
+                if "=" not in line or line.startswith("#"):
+                    continue
+                key, value = line.split("=", 1)
+                if key in {"Name", "NoDisplay", "Hidden", "Type"}:
+                    values[key] = value.strip()
+            if values.get("Type", "Application") != "Application":
+                continue
+            if values.get("NoDisplay", "false").lower() == "true" or values.get("Hidden", "false").lower() == "true":
+                continue
+            name = values.get("Name", "").strip()
+            if not name:
+                continue
+            applications.append({"id": app_id, "name": name})
+            seen.add(app_id)
+    return {"ok": True, "apps": sorted(applications, key=lambda app: app["name"].lower())}
+
+
+def launch_linux_application(identifier):
+    requested = str(identifier or "").strip()
+    if not requested or len(requested) > 160:
+        raise RuntimeError("Choose a Linux application from /linux apps")
+    apps = linux_applications()["apps"]
+    match = next((app for app in apps if app["id"].lower() == requested.lower()), None)
+    if not match:
+        exact_name = [app for app in apps if app["name"].lower() == requested.lower()]
+        match = exact_name[0] if len(exact_name) == 1 else None
+    if not match:
+        raise RuntimeError("Linux application not found. Run /linux apps to see the available app IDs")
+    code, uid, error = run(["id", "-u", "aos"], timeout=2)
+    if code != 0 or not uid.isdigit():
+        raise RuntimeError(error or "The A-OS desktop session is unavailable")
+    command = [
+        "runuser", "-u", "aos", "--", "env",
+        "DISPLAY=:0", "HOME=/home/aos", "XDG_RUNTIME_DIR=/run/user/" + uid,
+        "XAUTHORITY=/home/aos/.Xauthority", "gtk-launch", match["id"],
+    ]
+    try:
+        subprocess.Popen(
+            command,
+            cwd="/home/aos",
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env={**os.environ, "LC_ALL": "C.UTF-8"},
+            start_new_session=True,
+        )
+    except OSError as error:
+        raise RuntimeError("A-OS could not launch the Linux application") from error
+    return {"ok": True, "id": match["id"], "name": match["name"], "message": "Opened " + match["name"] + "."}
 
 
 def volume_state():
@@ -593,7 +662,7 @@ def read_block_devices(columns, device=None):
 
 def block_devices():
     return read_block_devices(
-        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,PARTTYPE,PARTUUID,PTTYPE"
+        "NAME,PATH,SIZE,TYPE,MODEL,TRAN,RM,MOUNTPOINTS,START,FSTYPE,LABEL,PARTLABEL,PARTTYPE,PARTUUID,PTTYPE"
     )
 
 
@@ -1071,6 +1140,121 @@ def aos_boot_entries():
     if code != 0:
         return set()
     return set(re.findall(r"^Boot([0-9A-Fa-f]{4})\*?\s+A-OS(?:\s|$)", output, re.MULTILINE))
+
+
+def _mountpoints(item):
+    value = item.get("mountpoints") or []
+    if isinstance(value, str):
+        value = value.splitlines()
+    return [str(point).strip() for point in value if str(point or "").strip()]
+
+
+def aos_partition_state():
+    devices = block_devices()
+    live_disk = os.path.realpath(live_source_device()) if live_source_device() else ""
+    partitions = []
+    protected_reasons = []
+    aos_partlabels = {"AOS_SYSTEM", "AOS_DATA", "AOS_EFI"}
+    for disk in devices:
+        if disk.get("type") != "disk":
+            continue
+        disk_path = os.path.realpath(str(disk.get("path") or ""))
+        children = disk.get("children") or []
+        has_aos_system = any(
+            str(child.get("label") or "").upper() == "AOS_SYSTEM"
+            or str(child.get("partlabel") or "").upper() == "AOS_SYSTEM"
+            for child in children
+        )
+        if not has_aos_system:
+            continue
+        for child in children:
+            label = str(child.get("label") or "")
+            partlabel = str(child.get("partlabel") or "")
+            if label.upper() not in {"AOS_SYSTEM", "AOS_EFI", "PERSISTENCE"} and partlabel.upper() not in aos_partlabels:
+                continue
+            path = os.path.realpath(str(child.get("path") or ""))
+            if not path:
+                continue
+            mounts = _mountpoints(child)
+            number = int(child.get("partn") or partition_number(path))
+            partitions.append({
+                "path": path,
+                "disk": disk_path,
+                "number": number,
+                "label": label or partlabel or "A-OS",
+                "size": int(child.get("size") or 0),
+                "mounted": bool(mounts),
+                "mountpoints": mounts,
+            })
+            if mounts:
+                protected_reasons.append(path + " is mounted")
+        if disk_path and disk_path == live_disk:
+            protected_reasons.append(disk_path + " is the disk currently running A-OS")
+    reason = ""
+    if protected_reasons:
+        reason = "Boot from the A-OS USB before deleting the installed A-OS partitions. " + "; ".join(sorted(set(protected_reasons))) + "."
+    return {
+        "ok": True,
+        "exists": bool(partitions),
+        "deletable": bool(partitions) and not protected_reasons,
+        "reason": reason,
+        "partitions": sorted(partitions, key=lambda item: (item["disk"], item["number"])),
+    }
+
+
+def _remove_aos_efi_directory(disk):
+    esp = windows_esp_for_disk(disk)
+    if not esp:
+        return
+    existing = mounted_path(esp)
+    mount_dir = None
+    try:
+        if existing:
+            root = Path(existing)
+        else:
+            mount_dir = Path(tempfile.mkdtemp(prefix="aos-esp-remove-", dir="/mnt"))
+            require_command(["mount", esp, str(mount_dir)], timeout=15)
+            root = mount_dir
+        directory = root / "EFI" / "AOSDesktop"
+        if directory.is_dir():
+            shutil.rmtree(directory)
+    finally:
+        if mount_dir:
+            run(["umount", str(mount_dir)], timeout=10)
+            try:
+                mount_dir.rmdir()
+            except OSError:
+                pass
+
+
+def delete_aos_partitions(confirmation):
+    if confirmation != "DELETE A-OS PARTITIONS":
+        raise RuntimeError("Type DELETE A-OS PARTITIONS to confirm")
+    state = aos_partition_state()
+    if not state["partitions"]:
+        return {"ok": True, "deleted": [], "message": "No A-OS partitions were found."}
+    if not state["deletable"]:
+        raise RuntimeError(state["reason"] or "The A-OS partitions are currently in use")
+    devices = {os.path.realpath(str(device.get("path") or "")): device for device in block_devices() if device.get("type") == "disk"}
+    grouped = {}
+    for partition in state["partitions"]:
+        grouped.setdefault(partition["disk"], []).append(partition)
+    deleted = []
+    for disk_path, partitions in grouped.items():
+        disk = devices.get(disk_path)
+        if not disk:
+            raise RuntimeError("A-OS could not re-check " + disk_path)
+        _remove_aos_efi_directory(disk)
+        for partition in sorted(partitions, key=lambda item: item["number"], reverse=True):
+            run(["swapoff", partition["path"]], timeout=8)
+            require_command(["parted", "-s", disk_path, "rm", str(partition["number"])], timeout=30)
+            deleted.append(partition["path"])
+        require_command(["partprobe", disk_path], timeout=30)
+    for entry in aos_boot_entries():
+        run(["efibootmgr", "-b", entry, "-B"], timeout=10)
+    run(["udevadm", "settle"], timeout=30)
+    require_command(["sync"], timeout=60)
+    return {"ok": True, "deleted": deleted, "message": "Deleted " + str(len(deleted)) + " A-OS partition" + ("." if len(deleted) == 1 else "s.")}
 
 
 def efi_boot_order():
@@ -1561,6 +1745,8 @@ class AosHandler(SimpleHTTPRequestHandler):
                 "/__aos/system": system_state,
                 "/__aos/info": device_info,
                 "/__aos/storage": storage_targets,
+                "/__aos/partitions/a-os": aos_partition_state,
+                "/__aos/linux/apps": linux_applications,
                 "/__aos/network/check": lambda: network_health(force=True),
                 "/__aos/wifi/scan": wifi_scan,
                 "/__aos/bluetooth/scan": bluetooth_scan,
@@ -1608,6 +1794,18 @@ class AosHandler(SimpleHTTPRequestHandler):
             try:
                 address = open_native_browser(body.get("url"))
                 self._json(200, {"ok": True, "url": address})
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
+            return
+        if route == "/__aos/partitions/a-os/delete":
+            try:
+                self._json(200, delete_aos_partitions(str(body.get("confirmation") or "")))
+            except RuntimeError as error:
+                self._json(409, {"ok": False, "error": str(error)})
+            return
+        if route == "/__aos/linux/launch":
+            try:
+                self._json(200, launch_linux_application(body.get("id")))
             except RuntimeError as error:
                 self._json(400, {"ok": False, "error": str(error)})
             return

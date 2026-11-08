@@ -22,7 +22,7 @@ function renderBootFailure(memoryGb, loadError) {
   document.body.innerHTML = `
     <main class="aos-hardware-error" role="alert" aria-live="assertive">
       <section>
-        <img src="./assets/icons/Error.png" alt="">
+        <img src="./assets/icons/sad.png" alt="A-OS system files could not be found">
         <small>A-OS HARDWARE CHECK</small>
         <h1>A-OS cannot start</h1>
         <p>${loadError ? "The Desktop system files could not be loaded." : `This device reports ${formatMemory(memoryGb)} GB of RAM. A-OS Desktop requires at least ${MINIMUM_RAM_GB} GB to boot.`}</p>
@@ -56,5 +56,5 @@ window.AOS_HARDWARE_STATE = {minimumRamGb: MINIMUM_RAM_GB, memoryGb, blocked};
 if (blocked) {
   renderBootFailure(memoryGb, false);
 } else {
-  import("./assets/index-D5wdOlTt-managed9.js?v=20261031-auth1").catch(() => renderBootFailure(memoryGb, true));
+  import("./assets/index-D5wdOlTt-managed9.js?v=20261103-bootgif1").catch(() => renderBootFailure(memoryGb, true));
 }

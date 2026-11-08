@@ -491,7 +491,37 @@
     }
     if (value === "/ai") { if (!openNamedApp("A-AI")) window.open("https://a-ai.web.app", "_blank"); appendTerminal(terminal, ["Opening A-AI."]); return true; }
     if (value === "/family") { openFamily(); appendTerminal(terminal, ["Family Device opened. Administrator password required."]); return true; }
-    if (value === "/help") { appendTerminal(terminal, ["A-OS 3.0 commands:", "/info  /kill  /py install  /restart  /shutdown  /ai  /family", "/run-<filename>indesktop  C://<file location>"]); return true; }
+    if (value === "/delete partitions a-os") {
+      var partitionState = await nativeRequest("/__aos/partitions/a-os");
+      var partitions = Array.isArray(partitionState.partitions) ? partitionState.partitions : [];
+      if (!partitions.length) {
+        appendTerminal(terminal, ["No A-OS partitions were found on this computer."]);
+        return true;
+      }
+      appendTerminal(terminal, ["Found " + partitions.length + " A-OS partition" + (partitions.length === 1 ? "." : "s."), partitions.map(function (item) { return item.path + " on " + item.disk; }).join(", ")]);
+      if (!partitionState.deletable) throw new Error(partitionState.reason || "These A-OS partitions cannot be deleted while they are in use.");
+      var confirmation = window.prompt("This permanently deletes every detected A-OS partition and its files. Type DELETE A-OS PARTITIONS to continue.");
+      if (confirmation !== "DELETE A-OS PARTITIONS") {
+        appendTerminal(terminal, ["Partition deletion cancelled."]);
+        return true;
+      }
+      var deletion = await nativeRequest("/__aos/partitions/a-os/delete", {confirmation: confirmation});
+      appendTerminal(terminal, [deletion.message || "A-OS partitions were deleted."]);
+      return true;
+    }
+    if (value === "/linux apps") {
+      var linuxApps = await nativeRequest("/__aos/linux/apps");
+      var appNames = (linuxApps.apps || []).map(function (app) { return app.name + " (" + app.id + ")"; });
+      appendTerminal(terminal, appNames.length ? ["Linux applications:", appNames.join(", ")] : ["No Linux applications were found."]);
+      return true;
+    }
+    var linuxOpen = value.match(/^\/linux open\s+(.+)$/i);
+    if (linuxOpen) {
+      var launched = await nativeRequest("/__aos/linux/launch", {id: linuxOpen[1].trim()});
+      appendTerminal(terminal, [launched.message || "Linux application opened."]);
+      return true;
+    }
+    if (value === "/help") { appendTerminal(terminal, ["A-OS Terminal 2.4 commands:", "/info  /kill  /py install  /restart  /shutdown  /ai  /family", "/linux apps  /linux open <app id>", "/delete partitions a-os", "/run-<filename>indesktop  C://<file location>"]); return true; }
     var desktopMatch = value.match(/^\/run-(.+)indesktop$/i);
     if (desktopMatch) {
       var desktopFile = files().find(function (file) { return String(file.name || "").toLowerCase() === desktopMatch[1].toLowerCase(); });
@@ -512,7 +542,7 @@
     if (!form) return;
     var input = form.querySelector("input");
     var command = input && input.value.trim();
-    if (!command || !(/^\/(info|kill|py install|restart|shutdown|ai|family|help)/i.test(command) || /^\/run-.+indesktop$/i.test(command) || /^C:\/\//i.test(command))) return;
+    if (!command || !(/^\/(info|kill|py install|restart|shutdown|ai|family|help|delete partitions a-os|linux apps|linux open\s+)/i.test(command) || /^\/run-.+indesktop$/i.test(command) || /^C:\/\//i.test(command))) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();

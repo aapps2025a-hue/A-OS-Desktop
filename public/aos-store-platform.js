@@ -52,6 +52,16 @@
     try { localStorage.setItem(key, value); return true; } catch (_) { return false; }
   }
 
+  function resetLegacyDeveloperDrafts() {
+    var marker = "aos-store-dev-clean-20261108";
+    if (safeGet(marker, "") === "true") return;
+    try { localStorage.removeItem(LOCAL_APPS_KEY); } catch (_) {}
+    try { localStorage.removeItem("aos-store-dev-project"); } catch (_) {}
+    safeSet(marker, "true");
+  }
+
+  resetLegacyDeveloperDrafts();
+
   function slugify(value) {
     return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64) || "a-store-app";
   }
@@ -299,6 +309,8 @@
     value.logo = String(value.logo || asset("Unnamed app.png"));
     value.preview = String(value.preview || value.logo || asset("Unnamed app.png"));
     value.video = String(value.video || "");
+    value.windowMode = value.windowMode === "close-only" ? "close-only" : "default";
+    value.lockscreenMode = ["visible", "active"].indexOf(value.lockscreenMode) >= 0 ? value.lockscreenMode : "hidden";
     value.downloads = Number(value.downloads || 0);
     value.showcaseUntil = Number(value.showcaseUntil || 0);
     value.files = value.files && typeof value.files === "object" ? value.files : {};
@@ -456,6 +468,8 @@
       version: app.version,
       storeSlug: app.slug,
       icon: app.logo,
+      windowMode: app.windowMode,
+      lockscreenMode: app.lockscreenMode,
       createdAt: existing && existing.createdAt || new Date().toISOString()
     };
     if (app.files && app.files["index.html"]) packaged.devCode = compileAppDocument(app);
@@ -480,11 +494,38 @@
     installed[app.slug] = app.version;
     safeSet(INSTALLED_KEY, JSON.stringify(installed));
     if (app.slug === "a-store-dev") safeSet("aos-store-dev-installed", "true");
+    if (window.AOS_BOOT_GIF && typeof window.AOS_BOOT_GIF.registerPackage === "function") {
+      window.AOS_BOOT_GIF.registerPackage(app, false);
+    }
     registerInstalledApp(app);
     incrementDownload(app);
     notify(app.name + (previousState === "update" ? " updated" : " installed"));
     ensureShelfButton();
     emit();
+  }
+
+  function uninstallApp(app) {
+    if (!app || app.slug === "a-store-dev") return;
+    var installed = installedVersions();
+    delete installed[app.slug];
+    safeSet(INSTALLED_KEY, JSON.stringify(installed));
+    var devApps = safeJson("aos-dev-apps", []);
+    if (!Array.isArray(devApps)) devApps = [];
+    devApps = devApps.filter(function (item) { return item.storeSlug !== app.slug; });
+    safeSet("aos-dev-apps", JSON.stringify(devApps));
+    document.querySelectorAll(".astore-app-instance[data-a-store-slug]").forEach(function (layer) {
+      if (layer.dataset.aStoreSlug === app.slug) layer.remove();
+    });
+    window.dispatchEvent(new CustomEvent("aos-installed-apps-changed", {detail: {app: app, removed: true}}));
+    notify(app.name + " uninstalled");
+    ensureShelfButton();
+    emit();
+  }
+
+  function uninstallMarkup(app) {
+    return !isAndroidHost() && installationState(app) !== "install" && app.slug !== "a-store-dev"
+      ? '<button type="button" class="danger astore-uninstall" data-astore-uninstall>Uninstall</button>'
+      : "";
   }
 
   function performAppAction(app, button) {
@@ -627,9 +668,11 @@
     article.dataset.slug = app.slug;
     article.innerHTML = '<button class="astore-card-preview" type="button" aria-label="View ' + escapeHtml(app.name) + '">' + appMedia(app, "") + '<span>' + escapeHtml(app.category) + '</span></button>' +
       '<div class="astore-card-body"><button type="button" class="astore-card-logo" aria-label="About ' + escapeHtml(app.name) + '"><img src="' + escapeHtml(app.logo) + '" alt=""></button><div class="astore-card-copy"><strong>' + escapeHtml(app.name) + '</strong><p>' + escapeHtml(app.description) + '</p><small>v' + escapeHtml(app.version) + ' - ' + Number(app.downloads || 0).toLocaleString() + ' downloads</small></div></div>' +
-      '<div class="astore-card-footer"><span class="astore-risk' + (review.safe ? " safe" : "") + '">' + escapeHtml(review.safe ? "Verified reputation" : "Review before opening") + '</span><button class="primary" type="button" data-astore-action' + (isAndroidHost() && !nativeApkInfo(app) ? " disabled" : "") + '>' + actionLabel(app) + '</button></div>';
+      '<div class="astore-card-footer"><span class="astore-risk' + (review.safe ? " safe" : "") + '">' + escapeHtml(review.safe ? "Verified reputation" : "Review before opening") + '</span><div class="astore-card-actions">' + uninstallMarkup(app) + '<button class="primary" type="button" data-astore-action' + (isAndroidHost() && !nativeApkInfo(app) ? " disabled" : "") + '>' + actionLabel(app) + '</button></div></div>';
     article.querySelectorAll(".astore-card-preview,.astore-card-logo").forEach(function (button) { button.addEventListener("click", function () { openDetails(app, rank); }); });
     article.querySelector("[data-astore-action]").addEventListener("click", function (event) { performAppAction(app, event.currentTarget); });
+    var uninstall = article.querySelector("[data-astore-uninstall]");
+    if (uninstall) uninstall.addEventListener("click", function () { uninstallApp(app); });
     return article;
   }
 
@@ -638,10 +681,12 @@
     var layer = document.createElement("div");
     layer.className = "astore-modal astore-shell";
     layer.innerHTML = '<section class="astore-dialog" role="dialog" aria-modal="true"><header class="astore-dialog-head"><img src="' + escapeHtml(app.logo) + '" alt=""><span><strong>' + escapeHtml(app.name) + '</strong><small>' + escapeHtml(app.category) + ' - version ' + escapeHtml(app.version) + '</small></span><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header>' +
-      '<div class="astore-detail-body"><div class="astore-detail-media">' + appMedia(app, "") + '</div><div class="astore-detail-copy"><div class="astore-detail-title"><img src="' + escapeHtml(app.logo) + '" alt=""><div><h2>' + escapeHtml(app.name) + '</h2><p>' + escapeHtml(app.publisher || "A-Store publisher") + '</p></div></div><p class="astore-detail-description">' + escapeHtml(app.description) + '</p><div class="astore-review-box' + (review.safe ? " safe" : "") + '"><strong>' + escapeHtml(review.title) + '</strong><p>' + escapeHtml(review.detail) + '</p></div>' + (isAndroidHost() ? '<p class="astore-apk-note">Android installs this as a separate app. Updates keep the same app identity and saved data.</p>' : "") + '<div class="astore-inline-actions"><button class="primary" data-install' + (isAndroidHost() && !nativeApkInfo(app) ? " disabled" : "") + '>' + actionLabel(app) + '</button>' + (app.ownerUid && readSession() && readSession().uid === app.ownerUid ? '<button data-edit>Edit this app</button>' : "") + '</div></div></div></section>';
+      '<div class="astore-detail-body"><div class="astore-detail-media">' + appMedia(app, "") + '</div><div class="astore-detail-copy"><div class="astore-detail-title"><img src="' + escapeHtml(app.logo) + '" alt=""><div><h2>' + escapeHtml(app.name) + '</h2><p>' + escapeHtml(app.publisher || "A-Store publisher") + '</p></div></div><p class="astore-detail-description">' + escapeHtml(app.description) + '</p><div class="astore-review-box' + (review.safe ? " safe" : "") + '"><strong>' + escapeHtml(review.title) + '</strong><p>' + escapeHtml(review.detail) + '</p></div>' + (isAndroidHost() ? '<p class="astore-apk-note">Android installs this as a separate app. Updates keep the same app identity and saved data.</p>' : "") + '<div class="astore-inline-actions">' + uninstallMarkup(app) + '<button class="primary" data-install' + (isAndroidHost() && !nativeApkInfo(app) ? " disabled" : "") + '>' + actionLabel(app) + '</button>' + (app.ownerUid && readSession() && readSession().uid === app.ownerUid ? '<button data-edit>Edit this app</button>' : "") + '</div></div></div></section>';
     layer.addEventListener("click", function (event) { if (event.target === layer) layer.remove(); });
     layer.querySelector(".astore-close").addEventListener("click", function () { layer.remove(); });
     layer.querySelector("[data-install]").addEventListener("click", function () { performAppAction(app, this); });
+    var uninstall = layer.querySelector("[data-astore-uninstall]");
+    if (uninstall) uninstall.addEventListener("click", function () { uninstallApp(app); layer.remove(); });
     var edit = layer.querySelector("[data-edit]");
     if (edit) edit.addEventListener("click", function () { layer.remove(); openDeveloper(app); });
     document.body.appendChild(layer);
@@ -649,7 +694,9 @@
     if (video) video.play().catch(function () {});
   }
 
-  function openApp(app) {
+  function openApp(app, options) {
+    app = normalizeApp(app);
+    options = options || {};
     if (app.slug === "a-store-dev") return openDeveloper();
     var existing = Array.from(document.querySelectorAll(".astore-app-instance[data-a-store-slug]")).find(function (layer) {
       return layer.dataset.aStoreSlug === app.slug;
@@ -659,26 +706,38 @@
       return;
     }
     var files = app.files && typeof app.files === "object" ? app.files : {};
-    var remote = Boolean(app.url && !files["index.html"]);
+    var packagedDocument = typeof app.devCode === "string" ? app.devCode : "";
+    var remote = Boolean(/^https?:\/\//i.test(app.url || "") && !files["index.html"] && !packagedDocument);
     if (remote && document.documentElement.dataset.aosStoreStandalone === "true") {
       location.href = app.url;
       return;
     }
-    if (!remote && !files["index.html"]) return notify("This app does not include index.html.");
+    if (!remote && !files["index.html"] && !packagedDocument) return notify("This app does not include index.html.");
     var layer = document.createElement("div");
-    layer.className = "astore-window-layer astore-shell astore-app-instance";
+    layer.className = "astore-window-layer astore-shell astore-app-instance astore-window-mode-" + app.windowMode + (options.locked ? " astore-lockscreen-app" : "");
     layer.dataset.aStoreSlug = app.slug;
     layer.dataset.aStoreName = app.name;
     layer.dataset.aStoreLogo = app.logo;
-    layer.innerHTML = '<section class="astore-app-window"><header class="astore-window-head"><img src="' + escapeHtml(app.logo) + '" alt=""><span><strong>' + escapeHtml(app.name) + '</strong><small>A-Store app - version ' + escapeHtml(app.version) + '</small></span><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><iframe title="' + escapeHtml(app.name) + '" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads" referrerpolicy="no-referrer"></iframe></section>';
+    var windowControls = app.windowMode === "close-only"
+      ? '<div class="astore-window-controls"><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></div>'
+      : '<div class="astore-window-controls"><button data-window-minimize aria-label="Minimize">&#8722;</button><button data-window-maximize aria-label="Maximize">&#9633;</button><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></div>';
+    layer.innerHTML = '<section class="astore-app-window"><header class="astore-window-head"><img src="' + escapeHtml(app.logo) + '" alt=""><span><strong>' + escapeHtml(app.name) + '</strong><small>A-Store app - version ' + escapeHtml(app.version) + '</small></span>' + windowControls + '</header><iframe title="' + escapeHtml(app.name) + '" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads" referrerpolicy="no-referrer"></iframe></section>';
     layer.querySelector(".astore-close").addEventListener("click", function () { closeAppWindow(layer); });
+    var minimize = layer.querySelector("[data-window-minimize]");
+    if (minimize) minimize.addEventListener("click", function () {
+      layer.dataset.aStoreMinimized = "true";
+      layer.style.display = "none";
+      ensureShelfButton();
+    });
+    var maximize = layer.querySelector("[data-window-maximize]");
+    if (maximize) maximize.addEventListener("click", function () { toggleMaximize(layer); });
     var frame = layer.querySelector("iframe");
     if (remote) {
       frame.setAttribute("sandbox", "allow-scripts allow-forms allow-same-origin allow-modals allow-popups allow-popups-to-escape-sandbox allow-downloads allow-presentation");
       frame.setAttribute("allow", "clipboard-read; clipboard-write; fullscreen; autoplay; encrypted-media; picture-in-picture; web-share");
       frame.src = STORE_WEB_RUNTIME + "?goto=" + encodeURIComponent(app.url);
     } else {
-      frame.srcdoc = compileAppDocument(app);
+      frame.srcdoc = packagedDocument || compileAppDocument(app);
     }
     document.body.appendChild(layer);
     activateAppWindow(layer);
@@ -687,6 +746,10 @@
 
   function focusAppWindow(layer) {
     if (!layer) return;
+    if (layer.dataset.aStoreMinimized === "true") {
+      layer.dataset.aStoreMinimized = "false";
+      layer.style.display = "block";
+    }
     appWindowZ = appWindowZ >= 9800 ? 8200 : appWindowZ + 1;
     document.querySelectorAll(".astore-app-instance.astore-window-active").forEach(function (windowElement) {
       windowElement.classList.remove("astore-window-active");
@@ -698,6 +761,32 @@
   function closeAppWindow(layer) {
     if (layer) layer.remove();
     ensureShelfButton();
+  }
+
+  function toggleMaximize(layer) {
+    if (!layer) return;
+    if (layer.dataset.aStoreMaximized === "true") {
+      var saved = safeJson("aos-store-window:" + layer.dataset.aStoreSlug, null);
+      if (saved) {
+        layer.style.left = saved.left;
+        layer.style.top = saved.top;
+        layer.style.width = saved.width;
+        layer.style.height = saved.height;
+      }
+      layer.dataset.aStoreMaximized = "false";
+      return;
+    }
+    safeSet("aos-store-window:" + layer.dataset.aStoreSlug, JSON.stringify({
+      left: layer.style.left,
+      top: layer.style.top,
+      width: layer.style.width || getComputedStyle(layer).width,
+      height: layer.style.height || getComputedStyle(layer).height
+    }));
+    layer.dataset.aStoreMaximized = "true";
+    layer.style.left = "8px";
+    layer.style.top = "8px";
+    layer.style.width = "calc(100vw - 16px)";
+    layer.style.height = "calc(100dvh - 84px)";
   }
 
   function activateAppWindow(layer) {
@@ -736,28 +825,8 @@
       });
       header.addEventListener("dblclick", function (event) {
         if (event.target.closest("button")) return;
-        if (layer.dataset.aStoreMaximized === "true") {
-          var saved = safeJson("aos-store-window:" + layer.dataset.aStoreSlug, null);
-          if (saved) {
-            layer.style.left = saved.left;
-            layer.style.top = saved.top;
-            layer.style.width = saved.width;
-            layer.style.height = saved.height;
-          }
-          layer.dataset.aStoreMaximized = "false";
-        } else {
-          safeSet("aos-store-window:" + layer.dataset.aStoreSlug, JSON.stringify({
-            left: layer.style.left,
-            top: layer.style.top,
-            width: layer.style.width || getComputedStyle(layer).width,
-            height: layer.style.height || getComputedStyle(layer).height
-          }));
-          layer.dataset.aStoreMaximized = "true";
-          layer.style.left = "8px";
-          layer.style.top = "8px";
-          layer.style.width = "calc(100vw - 16px)";
-          layer.style.height = "calc(100dvh - 84px)";
-        }
+        if (layer.classList.contains("astore-window-mode-close-only")) return;
+        toggleMaximize(layer);
       });
     }
     layer.addEventListener("pointerdown", function () { focusAppWindow(layer); });
@@ -814,7 +883,7 @@
 
   function renderStandalone(root) {
     root.className = "astore-shell";
-    root.innerHTML = '<header class="astore-topbar"><div class="astore-brand"><span>A</span><div><strong>A-Store</strong><small>Apps for A-OS and Android</small></div></div><label class="astore-search"><img src="' + asset("Search.svg") + '" alt=""><input type="search" placeholder="Search apps, categories, and publishers"></label><div class="astore-actions"><button class="astore-account-button" data-astore-account><img src="' + asset("Profile.png") + '" alt=""><span></span></button><button data-refresh aria-label="Refresh catalog">Refresh</button><button class="astore-install-pwa" data-install-pwa hidden>Install on Windows</button><a class="astore-button" href="' + ANDROID_APK_URL + '">A-Store for Android</a><button class="primary astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></header><main class="astore-main"><section class="astore-section"><div class="astore-featured" data-featured></div></section><section class="astore-section"><div class="astore-section-head"><div><h2>All apps</h2><p>Every Android app gets its own APK and stable identity. New packages are built within a few minutes of publishing.</p></div><span class="astore-trust-label" data-count></span></div><div class="astore-grid" data-grid></div><div class="astore-error" data-error hidden></div></section></main>';
+    root.innerHTML = '<header class="astore-topbar"><div class="astore-brand"><span>A</span><div><strong>A-Store</strong><small>Apps for A-OS and Android</small></div></div><label class="astore-search"><img src="' + asset("Search.svg") + '" alt=""><input type="search" placeholder="Search apps, categories, and publishers"></label><div class="astore-actions"><button class="astore-account-button" data-astore-account><img src="' + asset("Profile.png") + '" alt=""><span></span></button><button data-refresh aria-label="Refresh catalog">Refresh</button><button class="astore-install-pwa" data-install-pwa hidden>Install on Windows</button><a class="astore-button" href="' + ANDROID_APK_URL + '">A-Store for Android</a><button class="primary astore-dev-entry" data-dev><img src="' + asset("Code.png") + '" alt="">A-Store Dev</button></div></header><main class="astore-main"><section class="astore-section"><div class="astore-featured" data-featured></div></section><section class="astore-section"><div class="astore-section-head"><div><h2>All apps</h2><p>Install apps directly as draggable A-OS windows. Android also receives a separate APK with the same app identity.</p></div><span class="astore-trust-label" data-count></span></div><div class="astore-grid" data-grid></div><div class="astore-error" data-error hidden></div></section></main>';
     var search = root.querySelector("input[type=search]");
     var grid = root.querySelector("[data-grid]");
     var featured = root.querySelector("[data-featured]");
@@ -1021,14 +1090,16 @@
       version: existingApp ? existingApp.version : "1.0.0",
       logo: existingApp ? existingApp.logo : asset("Code.png"),
       preview: existingApp ? existingApp.preview : asset("Code.png"),
-      video: existingApp ? existingApp.video : ""
+      video: existingApp ? existingApp.video : "",
+      windowMode: existingApp ? existingApp.windowMode : "default",
+      lockscreenMode: existingApp ? existingApp.lockscreenMode : "hidden"
     };
     var layer = document.createElement("div");
     layer.className = "astore-window-layer astore-shell astore-app-instance";
     layer.dataset.aStoreSlug = "a-store-dev";
     layer.dataset.aStoreName = "A-Store Dev";
     layer.dataset.aStoreLogo = asset("Code.png");
-    layer.innerHTML = '<section class="astore-dev-window"><header class="astore-window-head"><img src="' + asset("Code.png") + '" alt=""><span><strong>A-Store Dev</strong><small>HTML app studio - folders, local backend routes, publishing, and updates</small></span><button data-preview>Preview</button><button data-publish-panel>Publish</button><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><div class="astore-dev-layout"><aside class="astore-dev-files"><div class="astore-dev-toolbar"><button data-new>New file</button><button data-backend>Backend</button></div><div class="astore-dev-toolbar"><button data-aos-folder>A-OS Files</button><button data-device-folder>Device folder</button><input type="file" webkitdirectory multiple hidden data-folder-input></div><div class="astore-file-list" data-file-list></div></aside><main class="astore-dev-editor"><div class="astore-editor-head" data-editor-name></div><textarea class="astore-code-editor" spellcheck="false" data-editor></textarea></main><aside class="astore-dev-publish" data-publish><h3>Publish to A-Store</h3><p>Apps appear in the catalog immediately. Promotion is reserved for one-week show-off selections and highly downloaded apps.</p><label class="astore-field">App name<input data-meta="name" maxlength="64"></label><label class="astore-field">Store ID<input data-meta="slug" maxlength="64"></label><label class="astore-field">Description<textarea data-meta="description" maxlength="400"></textarea></label><label class="astore-field">Category<select data-meta="category">' + CATEGORIES.map(function (category) { return '<option>' + category + '</option>'; }).join("") + '</select></label><label class="astore-field">Version<input data-meta="version" maxlength="20"></label><div class="astore-media-pickers"><label class="astore-media-picker" data-logo-picker>Logo<input type="file" accept="image/*" hidden data-media="logo"></label><label class="astore-media-picker" data-preview-picker>Preview<input type="file" accept="image/*" hidden data-media="preview"></label><label class="astore-media-picker" data-video-picker>Video<input type="file" accept="video/mp4,video/webm" hidden data-media="video"></label></div><label class="astore-field">Preview video URL (optional)<input data-meta="video" placeholder="https://..."></label><div class="astore-login-note" data-login-note></div><div class="astore-publish-status" data-status>Ready to scan this project.</div><div class="astore-inline-actions"><button data-scan>Check app</button><button class="primary" data-submit>Publish now</button></div></aside></div></section>';
+    layer.innerHTML = '<section class="astore-dev-window"><header class="astore-window-head"><img src="' + asset("Code.png") + '" alt=""><span><strong>A-Store Dev</strong><small>HTML app studio - folders, local backend routes, publishing, and updates</small></span><button data-preview>Preview</button><button data-publish-panel>Publish</button><button class="astore-close" aria-label="Close"><img src="' + asset("Cross.png") + '" alt=""></button></header><div class="astore-dev-layout"><aside class="astore-dev-files"><div class="astore-dev-toolbar"><button data-new>New file</button><button data-backend>Backend</button></div><div class="astore-dev-toolbar"><button data-aos-folder>A-OS Files</button><button data-device-folder>Device folder</button><input type="file" webkitdirectory multiple hidden data-folder-input></div><div class="astore-file-list" data-file-list></div></aside><main class="astore-dev-editor"><div class="astore-editor-head" data-editor-name></div><textarea class="astore-code-editor" spellcheck="false" data-editor></textarea></main><aside class="astore-dev-publish" data-publish><h3>Publish to A-Store</h3><p>Apps appear in the catalog immediately and install directly in A-OS. Android builds still receive their own APK.</p><label class="astore-field">App name<input data-meta="name" maxlength="64"></label><label class="astore-field">Store ID<input data-meta="slug" maxlength="64"></label><label class="astore-field">Description<textarea data-meta="description" maxlength="400"></textarea></label><label class="astore-field">Category<select data-meta="category">' + CATEGORIES.map(function (category) { return '<option>' + category + '</option>'; }).join("") + '</select></label><label class="astore-field">Version<input data-meta="version" maxlength="20"></label><label class="astore-field">Window controls<select data-meta="windowMode"><option value="default">Default - minimize, maximize and close</option><option value="close-only">1option - close only</option></select></label><label class="astore-field">Lock screen access<select data-meta="lockscreenMode"><option value="hidden">Do not show while locked</option><option value="visible">Show app button on lock screen</option><option value="active">Start when locked, end when unlocked</option></select></label><div class="astore-media-pickers"><label class="astore-media-picker" data-logo-picker><span>App icon</span><small>Upload image</small><input type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden data-media="logo" data-aos-allowed-picker="true"></label><label class="astore-media-picker" data-preview-picker><span>Preview</span><small>Upload image</small><input type="file" accept="image/*" hidden data-media="preview" data-aos-allowed-picker="true"></label><label class="astore-media-picker" data-video-picker><span>Video</span><small>Upload clip</small><input type="file" accept="video/mp4,video/webm" hidden data-media="video" data-aos-allowed-picker="true"></label></div><label class="astore-field">Preview video URL (optional)<input data-meta="video" placeholder="https://..."></label><div class="astore-login-note" data-login-note></div><div class="astore-publish-status" data-status>Ready to scan this project.</div><div class="astore-inline-actions"><button data-scan>Check app</button><button class="primary" data-submit>Publish now</button></div></aside></div></section>';
     document.body.appendChild(layer);
     activateAppWindow(layer);
     ensureShelfButton();
@@ -1040,9 +1111,18 @@
     function updateMediaPicker(kind) {
       var picker = layer.querySelector("[data-" + kind + "-picker]");
       var value = metadata[kind];
-      if (kind === "video" && value) picker.innerHTML = '<video src="' + escapeHtml(value) + '" muted></video><input type="file" accept="video/mp4,video/webm" hidden data-media="video">';
-      else if (value) picker.innerHTML = '<img src="' + escapeHtml(value) + '" alt=""><input type="file" accept="image/*" hidden data-media="' + kind + '">';
-      picker.querySelector("input").addEventListener("change", mediaChange);
+      var title = kind === "logo" ? "App icon" : kind === "preview" ? "Preview" : "Video";
+      var accept = kind === "video" ? "video/mp4,video/webm" : kind === "logo" ? "image/png,image/jpeg,image/webp,image/gif" : "image/*";
+      var media = "";
+      if (kind === "video" && value) media = '<video src="' + escapeHtml(value) + '" muted></video>';
+      else if (value) media = '<img src="' + escapeHtml(value) + '" alt="' + title + '">';
+      picker.innerHTML = media + '<span>' + title + '</span><small>' + (value ? "Click to replace" : "Upload file") + '</small><input type="file" accept="' + accept + '" hidden data-media="' + kind + '" data-aos-allowed-picker="true">';
+      picker.hidden = false;
+      picker.removeAttribute("aria-hidden");
+      var input = picker.querySelector("input");
+      input.disabled = false;
+      input.removeAttribute("aria-hidden");
+      input.addEventListener("change", mediaChange);
     }
 
     function renderFileList() {
@@ -1109,9 +1189,10 @@
       var input = event.currentTarget;
       var file = input.files && input.files[0];
       if (!file) return;
-      if (file.size > MAX_MEDIA_BYTES) return setStatus("Keep each logo, preview, or video under 260 KB.", "error");
+      if (file.size > MAX_MEDIA_BYTES) return setStatus("Keep each app icon, preview, or video under 260 KB.", "error");
       metadata[input.dataset.media] = await readFile(file);
       updateMediaPicker(input.dataset.media);
+      setStatus((input.dataset.media === "logo" ? "App icon" : input.dataset.media === "preview" ? "Preview image" : "Preview video") + " uploaded.", "success");
     }
 
     layer.querySelectorAll("[data-meta]").forEach(function (input) {
@@ -1124,7 +1205,6 @@
     updateMediaPicker("preview");
     if (metadata.video) updateMediaPicker("video");
     else layer.querySelector('[data-media="video"]').addEventListener("change", mediaChange);
-    layer.querySelectorAll('[data-media="logo"],[data-media="preview"]').forEach(function (input) { input.addEventListener("change", mediaChange); });
     var session = readSession();
     var loginNote = layer.querySelector("[data-login-note]");
     loginNote.innerHTML = session ? "Publishing as <strong>" + escapeHtml(session.email || "your A-Applications account") + "</strong>. Updates keep the same Store ID." : 'Sign in with A-Applications before publishing. <button type="button" data-dev-signin>Sign in</button>';
@@ -1226,6 +1306,7 @@
     openDetails: openDetails,
     openApp: openApp,
     installApp: installApp,
+    uninstallApp: uninstallApp,
     publishApp: publishApp,
     loadApkIndex: loadApkIndex,
     scanPackage: scanPackage,
