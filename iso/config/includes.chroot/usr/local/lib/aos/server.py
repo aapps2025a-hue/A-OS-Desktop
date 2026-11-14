@@ -39,7 +39,9 @@ NETWORK_HEALTH_CACHE = {"at": 0.0, "value": None}
 NETWORK_HEALTH_LOCK = Lock()
 UPDATE_LOCK = Lock()
 INSTALL_LOCK = Lock()
-UPDATE_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
+UPDATE_STATE_FILE = STATE_ROOT / "update-state.json"
+UPDATE_CACHE_ROOT = STATE_ROOT / "update-cache"
+UPDATE_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": "", "version": None}
 INSTALL_STATE = {"running": False, "stage": "idle", "progress": 0, "message": "", "error": ""}
 MIB = 1024 * 1024
 GIB = 1024 * MIB
@@ -160,6 +162,57 @@ def set_job_state(state, lock, **changes):
 def job_snapshot(state, lock):
     with lock:
         return dict(state)
+
+
+def persist_update_state(snapshot=None):
+    value = snapshot if snapshot is not None else job_snapshot(UPDATE_STATE, UPDATE_LOCK)
+    try:
+        UPDATE_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        pending = UPDATE_STATE_FILE.with_name("." + UPDATE_STATE_FILE.name + ".pending")
+        pending.write_text(json.dumps(value, ensure_ascii=True, indent=2) + "\n", encoding="utf-8")
+        os.replace(pending, UPDATE_STATE_FILE)
+    except OSError:
+        # Updating must still work when a live or damaged filesystem cannot save progress.
+        pass
+
+
+def set_update_state(**changes):
+    with UPDATE_LOCK:
+        UPDATE_STATE.update(changes)
+        snapshot = dict(UPDATE_STATE)
+    persist_update_state(snapshot)
+    return snapshot
+
+
+def restore_update_state(start_worker=True):
+    saved = read_json_file(UPDATE_STATE_FILE)
+    if not isinstance(saved, dict):
+        return job_snapshot(UPDATE_STATE, UPDATE_LOCK)
+    allowed = {"running", "stage", "progress", "message", "error", "version"}
+    with UPDATE_LOCK:
+        UPDATE_STATE.update({key: saved[key] for key in allowed if key in saved})
+        snapshot = dict(UPDATE_STATE)
+    if not snapshot.get("running"):
+        return snapshot
+    version = snapshot.get("version")
+    revision = str((version or {}).get("revision") or "").lower() if isinstance(version, dict) else ""
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        return set_update_state(
+            running=False,
+            stage="error",
+            error="The interrupted update did not contain a verified revision.",
+            message="The update was not installed",
+        )
+    set_update_state(
+        running=True,
+        stage="recovering",
+        progress=max(2, min(70, int(snapshot.get("progress") or 2))),
+        message="Resuming the interrupted A-OS update",
+        error="",
+    )
+    if start_worker:
+        Thread(target=update_worker, args=(version,), daemon=True).start()
+    return job_snapshot(UPDATE_STATE, UPDATE_LOCK)
 
 
 def remote_version(force=False):
@@ -1640,6 +1693,52 @@ def install_native_server(staged_server):
     os.replace(pending, NATIVE_SERVER_PATH)
 
 
+def download_update_archive(revision, destination, retries=5):
+    destination = Path(destination)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    last_error = None
+    for attempt in range(retries):
+        received = destination.stat().st_size if destination.is_file() else 0
+        if received > 512 * MIB:
+            raise RuntimeError("The update download is unexpectedly large")
+        headers = {"User-Agent": "A-OS-Updater/3.0"}
+        if received:
+            headers["Range"] = "bytes=" + str(received) + "-"
+        request = Request(SOURCE_ARCHIVE_URL.format(revision=revision), headers=headers)
+        try:
+            with urlopen(request, timeout=30) as response:
+                resumed = received > 0 and int(getattr(response, "status", 200) or 200) == 206
+                if not resumed:
+                    received = 0
+                content_length = int(response.headers.get("Content-Length") or 0)
+                total = received + content_length if content_length else 0
+                mode = "ab" if resumed else "wb"
+                set_update_state(stage="downloading", message="Downloading the verified A-OS source revision")
+                with destination.open(mode) as handle:
+                    while True:
+                        block = response.read(MIB)
+                        if not block:
+                            break
+                        received += len(block)
+                        if received > 512 * MIB:
+                            raise RuntimeError("The update download is unexpectedly large")
+                        handle.write(block)
+                        if total:
+                            set_update_state(progress=min(54, 8 + int(received / total * 46)))
+            return destination
+        except (HTTPError, URLError, TimeoutError, OSError) as error:
+            last_error = error
+            if attempt + 1 >= retries:
+                break
+            delay = min(12, 2 ** attempt)
+            set_update_state(
+                stage="reconnecting",
+                message="The connection paused. A-OS will retry the update in " + str(delay) + " seconds.",
+            )
+            time.sleep(delay)
+    raise RuntimeError("The update download could not continue: " + str(last_error or "network unavailable"))
+
+
 def update_worker(version):
     work = None
     partial_release = None
@@ -1647,25 +1746,13 @@ def update_worker(version):
         revision = str((version or {}).get("revision") or "").lower()
         if not re.fullmatch(r"[0-9a-f]{40}", revision):
             raise RuntimeError("The published update is not linked to a verified source revision")
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="downloading", progress=8, message="Downloading the verified A-OS source revision")
+        set_update_state(stage="downloading", progress=8, message="Downloading the verified A-OS source revision", error="", version=version)
         STATE_ROOT.mkdir(parents=True, exist_ok=True)
         RELEASES_ROOT.mkdir(parents=True, exist_ok=True)
+        UPDATE_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix="update-", dir=str(STATE_ROOT)))
-        archive_path = work / "update.tar.gz"
-        request = Request(SOURCE_ARCHIVE_URL.format(revision=revision), headers={"User-Agent": "A-OS-Updater/3.0"})
-        with urlopen(request, timeout=30) as response, archive_path.open("wb") as handle:
-            total, received = int(response.headers.get("Content-Length") or 0), 0
-            while True:
-                block = response.read(1024 * 1024)
-                if not block:
-                    break
-                received += len(block)
-                if received > 512 * 1024 * 1024:
-                    raise RuntimeError("The update download is unexpectedly large")
-                handle.write(block)
-                if total:
-                    set_job_state(UPDATE_STATE, UPDATE_LOCK, progress=min(54, 8 + int(received / total * 46)))
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="verifying", progress=58, message="Verifying and preparing A-OS files")
+        archive_path = download_update_archive(revision, UPDATE_CACHE_ROOT / (revision + ".tar.gz.partial"))
+        set_update_state(stage="verifying", progress=58, message="Verifying and preparing A-OS files")
         partial_release = RELEASES_ROOT / (revision + ".partial")
         shutil.rmtree(partial_release, ignore_errors=True)
         partial_release.mkdir()
@@ -1674,7 +1761,7 @@ def update_worker(version):
         extract_native_server(archive_path, staged_server)
         if not (partial_release / "index.html").is_file():
             raise RuntimeError("The update is missing the A-OS start page")
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, stage="installing", progress=76, message="Installing the update in the background")
+        set_update_state(stage="installing", progress=76, message="Installing the update in the background")
         (partial_release / "version.json").write_text(json.dumps(version, indent=2) + "\n", encoding="utf-8")
         release = RELEASES_ROOT / revision
         if release.exists():
@@ -1692,9 +1779,12 @@ def update_worker(version):
         os.replace(next_link, ACTIVE_RELEASE)
         install_native_server(staged_server)
         require_command(["sync"], timeout=60)
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="complete", progress=100, message="A-OS and its device services are updated. Restart to use the new version.")
+        archive_path.unlink(missing_ok=True)
+        set_update_state(running=False, stage="complete", progress=100, error="", message="A-OS and its device services are updated. Restart to use the new version.")
     except Exception as error:
-        set_job_state(UPDATE_STATE, UPDATE_LOCK, running=False, stage="error", error=str(error), message="The update was not installed")
+        if "archive_path" in locals() and job_snapshot(UPDATE_STATE, UPDATE_LOCK).get("stage") in {"verifying", "installing"}:
+            archive_path.unlink(missing_ok=True)
+        set_update_state(running=False, stage="error", error=str(error), message="The update was not installed")
     finally:
         if partial_release:
             shutil.rmtree(partial_release, ignore_errors=True)
@@ -1758,7 +1848,7 @@ class AosHandler(SimpleHTTPRequestHandler):
                     self._json(503, {"ok": False, "error": str(error)})
                 return
             if route == "/__aos/update":
-                self._json(200, {"packagedVersion": read_json_file(active_public_root() / "version.json"), "remoteVersion": remote_version(), "persistent": persistent_storage_active()})
+                self._json(200, {"packagedVersion": read_json_file(active_public_root() / "version.json"), "remoteVersion": remote_version(), "persistent": persistent_storage_active(), "update": job_snapshot(UPDATE_STATE, UPDATE_LOCK)})
                 return
             if route == "/__aos/update/status":
                 self._json(200, {"ok": True, **job_snapshot(UPDATE_STATE, UPDATE_LOCK)})
@@ -1920,11 +2010,16 @@ class AosHandler(SimpleHTTPRequestHandler):
                 if UPDATE_STATE["running"]:
                     self._json(409, {"ok": False, "error": "An update is already running"})
                     return
-                UPDATE_STATE.update({"running": True, "stage": "starting", "progress": 2, "message": "Preparing the A-OS update", "error": ""})
+                UPDATE_STATE.update({"running": True, "stage": "starting", "progress": 2, "message": "Preparing the A-OS update", "error": "", "version": version})
+                update_snapshot = dict(UPDATE_STATE)
+            persist_update_state(update_snapshot)
             Thread(target=update_worker, args=(version,), daemon=True).start()
             self._json(202, {"ok": True, "started": True})
             return
         if route in {"/__aos/power/restart", "/__aos/power/shutdown", "/__aos/power/hibernate"}:
+            if job_snapshot(UPDATE_STATE, UPDATE_LOCK).get("running"):
+                self._json(409, {"ok": False, "error": "A-OS is installing an update. Wait for it to finish before restarting or shutting down."})
+                return
             action = "restart" if route.endswith("restart") else "hibernate" if route.endswith("hibernate") else "shutdown"
             self._json(200, {"ok": True, "action": action})
             Timer(0.8, finish_power_action, args=(action,)).start()
@@ -1939,4 +2034,5 @@ class AosHandler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    restore_update_state()
     ThreadingHTTPServer(("127.0.0.1", PORT), AosHandler).serve_forever()

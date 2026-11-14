@@ -252,6 +252,7 @@
     var bar = element("span", "");
     progress.appendChild(bar);
     body.append(message, progress);
+    body.appendChild(element("small", "aos-native-update__note", "You can close this panel. A-OS will keep updating in the background."));
     function poll() {
       if (!panel || panelTab !== "update") return;
       window.aosUpdateBridge.status().then(function (state) {
@@ -288,6 +289,10 @@
     body.appendChild(element("p", "aos-native-empty", "Checking for a newer A-OS build..."));
     window.aosUpdateBridge.check().then(function (state) {
       body.innerHTML = "";
+      if (state.update && state.update.running) {
+        updateProgress(body);
+        return;
+      }
       var current = element("article", "aos-native-update__version");
       current.append(element("small", "", "Installed"), element("b", "", versionLabel(state.packagedVersion)));
       var latest = element("article", "aos-native-update__version");

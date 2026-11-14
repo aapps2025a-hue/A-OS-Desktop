@@ -508,6 +508,12 @@
   margin: 4px 0 12px;
   color: #253950;
 }
+.aos-native-update__note {
+  display: block;
+  margin: 10px 0 4px;
+  color: #63788a;
+  line-height: 1.45;
+}
 
 .aos-native-update__progress {
   height: 8px;

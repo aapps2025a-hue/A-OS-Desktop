@@ -43,6 +43,14 @@ The Chromium profile is also kept under `/var/lib/aos`, preserving Files,
 settings, installed apps, browser data, accounts, and hibernation state on the
 installed disk.
 
+The installer USB uses Debian Live's `toram` mode. After the A-OS desktop has
+fully appeared, the live filesystem is running from memory and the USB can be
+removed without stopping the session. Installed A-OS continues to boot from its
+internal system partition and does not reserve RAM for this copy. Update state
+is saved atomically under `/var/lib/aos`; an interrupted native service resumes
+the verified revision, while restart, shutdown, and hibernate are held until
+the critical installation phase has finished.
+
 Virtual machines only show physical Wi-Fi or Bluetooth devices when the host
 passes the corresponding hardware through to the guest. The live boot enables
 Debian Live persistence when the USB has a writable persistence partition.

@@ -1,5 +1,6 @@
 import importlib.util
 import io
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -535,6 +536,66 @@ Boot0007* A-OS
             self.assertEqual(installed.read_bytes(), source)
             if os.name != "nt":
                 self.assertTrue(installed.stat().st_mode & 0o100)
+
+    def test_live_iso_copies_the_read_only_media_to_ram(self):
+        config = (REPOSITORY / "iso/auto/config").read_text(encoding="utf-8")
+        self.assertIn("persistence toram quiet splash", config)
+        self.assertNotIn(" toram ", SERVER.standalone_grub_configuration("system-uuid"))
+
+    def test_update_progress_is_persisted_and_can_resume(self):
+        original_path = SERVER.UPDATE_STATE_FILE
+        original_state = dict(SERVER.UPDATE_STATE)
+        with TemporaryDirectory() as directory:
+            SERVER.UPDATE_STATE_FILE = Path(directory) / "update-state.json"
+            version = {"version": "3.0", "revision": "a" * 40}
+            try:
+                SERVER.set_update_state(running=True, stage="downloading", progress=31, version=version)
+                saved = json.loads(SERVER.UPDATE_STATE_FILE.read_text(encoding="utf-8"))
+                self.assertEqual(saved["progress"], 31)
+                SERVER.UPDATE_STATE.update({"running": False, "stage": "idle", "progress": 0, "version": None})
+                restored = SERVER.restore_update_state(start_worker=False)
+            finally:
+                SERVER.UPDATE_STATE_FILE = original_path
+                SERVER.UPDATE_STATE.clear()
+                SERVER.UPDATE_STATE.update(original_state)
+            self.assertTrue(restored["running"])
+            self.assertEqual(restored["stage"], "recovering")
+            self.assertEqual(restored["version"], version)
+
+    def test_update_download_reconnects_and_resumes_partial_file(self):
+        class Response:
+            def __init__(self, blocks, status, length):
+                self.blocks = iter(blocks)
+                self.status = status
+                self.headers = {"Content-Length": str(length)}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self, _):
+                value = next(self.blocks)
+                if isinstance(value, Exception):
+                    raise value
+                return value
+
+        original_path = SERVER.UPDATE_STATE_FILE
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            SERVER.UPDATE_STATE_FILE = root / "state.json"
+            partial = root / "update.partial"
+            first = Response([b"first", SERVER.URLError("offline")], 200, 11)
+            second = Response([b"second", b""], 206, 6)
+            try:
+                with patch.object(SERVER, "urlopen", side_effect=[first, second]) as opener, patch.object(SERVER.time, "sleep"):
+                    SERVER.download_update_archive("b" * 40, partial, retries=2)
+            finally:
+                SERVER.UPDATE_STATE_FILE = original_path
+            self.assertEqual(partial.read_bytes(), b"firstsecond")
+            resumed_request = opener.call_args_list[1].args[0]
+            self.assertEqual(resumed_request.get_header("Range"), "bytes=5-")
 
     def test_native_hibernate_dialog_uses_session_saving_bridge(self):
         runtime = (REPOSITORY / "public/aos-live-native-runtime.js").read_text(encoding="utf-8")
