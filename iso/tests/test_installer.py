@@ -420,6 +420,19 @@ Boot0007* A-OS
         self.assertTrue(health["dns"])
         self.assertEqual(health["message"], "Internet connection is working")
 
+    def test_network_health_is_independent_from_update_server(self):
+        response = MagicMock()
+        response.status = 204
+        response.__enter__.return_value = response
+        with patch.object(SERVER, "networking_enabled", return_value=True):
+            with patch.object(SERVER.socket, "getaddrinfo", return_value=[("", "", "", "", "")]) as resolver:
+                with patch.object(SERVER, "urlopen", return_value=response) as opener:
+                    health = SERVER.network_health(force=True)
+        resolver.assert_called_once_with(SERVER.CONNECTIVITY_HOST, 443, type=SERVER.socket.SOCK_STREAM)
+        self.assertEqual(opener.call_args.args[0].full_url, SERVER.CONNECTIVITY_URL)
+        self.assertNotEqual(SERVER.CONNECTIVITY_URL, SERVER.REMOTE_VERSION_URL)
+        self.assertTrue(health["online"])
+
     def test_network_health_identifies_certificate_errors(self):
         error = SERVER.URLError(SERVER.ssl.SSLCertVerificationError(1, "certificate is not yet valid"))
         with patch.object(SERVER, "networking_enabled", return_value=True), patch.object(SERVER.socket, "getaddrinfo", return_value=[]), patch.object(SERVER, "urlopen", side_effect=error):
@@ -445,6 +458,9 @@ Boot0007* A-OS
         self.assertIn("systemd-timesyncd", (config / "package-lists/aos.list.chroot").read_text())
         self.assertIn("systemctl enable systemd-timesyncd.service", (config / "hooks/live/0100-aos-permissions.hook.chroot").read_text())
         self.assertIn("timedatectl set-ntp true", (config / "includes.chroot/usr/local/lib/aos/network-ready.sh").read_text())
+        session = (config / "includes.chroot/etc/skel/.xinitrc").read_text()
+        self.assertIn("connectivitycheck.gstatic.com/generate_204", session)
+        self.assertNotIn("a-os-desktop.web.app/version.json", session)
 
     def test_volume_state_reads_pipewire_default_sink(self):
         with patch.object(SERVER, "run_as_aos", return_value=(0, "Volume: 0.65 [MUTED]", "")):

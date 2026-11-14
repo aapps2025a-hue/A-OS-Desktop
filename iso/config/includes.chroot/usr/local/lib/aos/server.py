@@ -29,6 +29,8 @@ READY_FILE = Path(os.environ.get("AOS_READY_FILE", "/tmp/aos-browser-ready"))
 PORT = int(os.environ.get("AOS_PORT", "5000"))
 REMOTE_VERSION_URL = "https://a-os-desktop.web.app/version.json"
 SOURCE_ARCHIVE_URL = "https://github.com/aapps2025a-hue/A-OS-Desktop/archive/{revision}.tar.gz"
+CONNECTIVITY_HOST = "connectivitycheck.gstatic.com"
+CONNECTIVITY_URL = "https://connectivitycheck.gstatic.com/generate_204"
 NATIVE_SERVER_PATH = Path(os.environ.get("AOS_NATIVE_SERVER_PATH", "/usr/local/lib/aos/server.py")).resolve()
 MAX_BODY = 256 * 1024
 COMMAND_TIMEOUT = 12
@@ -566,14 +568,14 @@ def network_health(force=False):
         result["failure"] = "dns"
         result["message"] = "Connected to a network, checking Internet access"
         try:
-            socket.getaddrinfo("a-os-desktop.web.app", 443, type=socket.SOCK_STREAM)
+            socket.getaddrinfo(CONNECTIVITY_HOST, 443, type=socket.SOCK_STREAM)
             result["dns"] = True
         except OSError:
             result["message"] = "Connected, but DNS is not responding"
         if result["dns"]:
             result["failure"] = "connection"
             try:
-                request = Request(REMOTE_VERSION_URL, method="HEAD", headers={"User-Agent": "A-OS/3.0"})
+                request = Request(CONNECTIVITY_URL, headers={"User-Agent": "A-OS/3.0"})
                 with urlopen(request, timeout=15) as response:
                     result["online"] = 200 <= int(response.status) < 500
                 result["failure"] = "" if result["online"] else "http"
