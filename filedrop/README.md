@@ -20,7 +20,7 @@ The repository workflow `.github/workflows/build-filedrop.yml` creates:
 - `A-OS-FileDrop-macOS.dmg`, ready to install on macOS
 - `A-OS-FileDrop-macOS.zip`, containing the raw macOS `.app`
 
-The packages and SHA-256 checksums are attached to the `A-OS FileDrop 1.0` GitHub release. They use the same FileDrop icon and are built by GitHub Actions because a genuine macOS `.app` and `.dmg` must be built on macOS. Release signing and notarization require Apple and Microsoft signing identities and are intentionally separate from the reproducible build.
+The packages and SHA-256 checksums are attached to the latest `A-OS FileDrop` GitHub release. They use the same FileDrop icon and are built by GitHub Actions because a genuine macOS `.app` and `.dmg` must be built on macOS. The Mac app is ad-hoc signed and its signature is verified before packaging. Removing Apple's unidentified-developer warning requires an Apple Developer ID and notarization; until those credentials are available, follow the `READ-ME-FIRST.txt` instructions included in the DMG to approve the app once in **System Settings > Privacy & Security**.
 
 ## Security model
 

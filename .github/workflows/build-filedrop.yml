@@ -43,6 +43,13 @@ jobs:
       - name: Build native desktop app
         run: pyinstaller --noconfirm --clean --onefile --windowed --name A-OS-FileDrop --icon "${{ matrix.icon }}" --paths filedrop filedrop/desktop_app.py
 
+      - name: Sign and verify macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          codesign --force --deep --sign - --timestamp=none "dist/A-OS-FileDrop.app"
+          codesign --verify --deep --strict --verbose=2 "dist/A-OS-FileDrop.app"
+
       - name: Package Windows app
         if: runner.os == 'Windows'
         shell: pwsh
@@ -60,6 +67,20 @@ jobs:
           mkdir dmg-root
           cp -R "dist/A-OS-FileDrop.app" dmg-root/
           ln -s /Applications dmg-root/Applications
+          cat > dmg-root/READ-ME-FIRST.txt <<'EOF'
+          A-OS FileDrop for macOS
+
+          1. Drag A-OS-FileDrop.app to Applications.
+          2. Try to open it once.
+          3. If macOS says Apple cannot check the app, open System Settings,
+             select Privacy & Security, scroll to Security, and click Open Anyway.
+          4. Confirm Open. macOS remembers this choice for future launches.
+
+          The app is reproducibly built and ad-hoc signed by GitHub Actions.
+          Apple only removes this warning for apps signed and notarized with a
+          paid Apple Developer ID. You can verify the downloaded DMG against the
+          SHA-256 checksum attached to the same GitHub release.
+          EOF
           hdiutil create \
             -volname "A-OS FileDrop" \
             -srcfolder dmg-root \
@@ -103,13 +124,15 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: filedrop-v1.0.0
-          name: A-OS FileDrop 1.0
-          make_latest: false
+          tag_name: filedrop-v1.0.1
+          name: A-OS FileDrop 1.0.1
+          make_latest: true
           body: |
             FileDrop transfers files directly between A-OS, Windows, and macOS devices on the same local network.
 
-            The macOS download is the `.dmg` file. The app is currently unsigned, so macOS may ask you to right-click the app and choose Open the first time.
+            The macOS download is `A-OS-FileDrop-macOS.dmg`. Its app bundle is ad-hoc signed and signature-verified during the GitHub build.
+
+            Apple only suppresses the unidentified-developer warning for Developer ID-signed and notarized apps. Until A-OS has an Apple Developer ID, install the app, try to open it once, then open **System Settings > Privacy & Security** and select **Open Anyway**. This is a one-time choice for that build. Installation instructions are also included inside the DMG.
           files: |
             release-assets/A-OS-FileDrop-Windows.zip
             release-assets/A-OS-FileDrop-Windows.zip.sha256
