@@ -3,6 +3,8 @@ firebase-debug.log
 firebase-debug.*.log
 node_modules/
 dist/
+build/
+*.spec
 _site/
 .DS_Store
 Thumbs.db
