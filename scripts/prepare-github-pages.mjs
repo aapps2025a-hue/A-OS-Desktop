@@ -1,4 +1,4 @@
-import {cpSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
+import {cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from "node:fs";
 import {extname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 
@@ -36,5 +36,7 @@ writeFileSync(
     revision: process.env.GITHUB_SHA || "github-pages"
   }, null, 2) + "\n"
 );
-cpSync(new URL("index.html", output), new URL("404.html", output));
+const index = new URL("index.html", output);
+if (!existsSync(index)) cpSync(new URL("download-aos.html", output), index);
+cpSync(index, new URL("404.html", output));
 
