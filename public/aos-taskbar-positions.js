@@ -239,3 +239,58 @@
   window.addEventListener("DOMContentLoaded", scheduleEnhance, {once: true});
   window.addEventListener("storage", scheduleEnhance);
 })();
+
+(function () {
+  "use strict";
+
+  function installCursorStyles() {
+    if (document.querySelector('link[href*="aos-cursors.css"]')) return;
+    var stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "./aos-cursors.css?v=20261121-cursors1";
+    document.head.appendChild(stylesheet);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", installCursorStyles, {once: true});
+  } else {
+    installCursorStyles();
+  }
+
+  function resizeKind(element) {
+    var value = [
+      element.getAttribute("data-resize") || "",
+      element.getAttribute("data-direction") || "",
+      typeof element.className === "string" ? element.className : ""
+    ].join(" ").toLowerCase();
+    if (/nesw|resize-ne|resize-sw|\bne\b|\bsw\b/.test(value)) return "nesw-resize";
+    if (/nwse|resize-nw|resize-se|\bnw\b|\bse\b/.test(value)) return "nwse-resize";
+    if (/resize-ns|resize-n|resize-s|\bns\b/.test(value)) return "ns-resize";
+    if (/resize-ew|resize-e|resize-w|\bew\b/.test(value)) return "ew-resize";
+    return "nwse-resize";
+  }
+
+  function cursorKind(target) {
+    if (!(target instanceof Element)) return "arrow";
+    if (target.closest("button:disabled,input:disabled,select:disabled,[aria-disabled='true'],[data-aos-cursor='blocked']")) return "blocked";
+    if (target.closest("[aria-busy='true'],.aos-cursor-wait")) return "wait";
+    if (target.closest(".loading,.aos-loading,.aos-cursor-progress")) return "progress";
+    if (target.closest(".paint-app canvas,.image-assist canvas,.aos-cursor-pen")) return "pen";
+    if (target.closest(".screenshot-selector,.aos-cursor-crosshair")) return "crosshair";
+    var resize = target.closest(".window-resize-handle,.resize-handle,[data-resize],[data-direction^='resize']");
+    if (resize) return resizeKind(resize);
+    if (target.closest(".system-window>header,.aos-cursor-move")) return "move";
+    if (target.closest("input:not([type='checkbox']):not([type='radio']):not([type='range']),textarea,[contenteditable='true']")) return "text";
+    if (target.closest("button,a,label,select,summary,[role='button'],[draggable='true']")) return "hand";
+    return "arrow";
+  }
+
+  window.addEventListener("pointermove", function (event) {
+    var target = event.target;
+    queueMicrotask(function () {
+      var pointer = document.getElementById("aos-custom-pointer");
+      if (!pointer) return;
+      pointer.dataset.kind = cursorKind(target);
+    });
+  }, {passive: true});
+})();

@@ -1,0 +1,209 @@
+:root {
+  --aos-cursor-arrow: url("./assets/cursors/cursor.png") 16 8, default;
+  --aos-cursor-hand: url("./assets/cursors/hand.png") 22 11, pointer;
+  --aos-cursor-text: url("./assets/cursors/text.png") 32 32, text;
+  --aos-cursor-wait: url("./assets/cursors/wait.png") 32 32, wait;
+  --aos-cursor-progress: url("./assets/cursors/progress.png") 16 8, progress;
+  --aos-cursor-blocked: url("./assets/cursors/not-allowed.png") 32 32, not-allowed;
+  --aos-cursor-ns: url("./assets/cursors/ns-resize.png") 32 32, ns-resize;
+  --aos-cursor-ew: url("./assets/cursors/ew-resize.png") 32 32, ew-resize;
+  --aos-cursor-nesw: url("./assets/cursors/nesw-resize.png") 32 32, nesw-resize;
+  --aos-cursor-nwse: url("./assets/cursors/nwse-resize.png") 32 32, nwse-resize;
+  --aos-cursor-move: url("./assets/cursors/move.png") 32 32, move;
+  --aos-cursor-crosshair: url("./assets/cursors/crosshair.png") 32 32, crosshair;
+  --aos-cursor-pen: url("./assets/cursors/pen.png") 18 57, crosshair;
+}
+
+html,
+body,
+.desktop,
+.system-window,
+.bios,
+.bios *,
+.legacy-terminal,
+.legacy-terminal *,
+.system-terminal,
+.system-terminal *,
+.desktop iframe {
+  cursor: var(--aos-cursor-arrow) !important;
+}
+
+button,
+a,
+label,
+select,
+summary,
+[role="button"],
+[draggable="true"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+.aos-cursor-hand,
+.bios button,
+.bios a,
+.bios label,
+.bios select,
+.legacy-terminal button,
+.legacy-terminal a,
+.legacy-terminal label,
+.system-terminal button,
+.system-terminal a,
+.system-terminal label {
+  cursor: var(--aos-cursor-hand) !important;
+}
+
+input:not([type]),
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="password"],
+input[type="url"],
+input[type="number"],
+textarea,
+[contenteditable="true"],
+.aos-cursor-text,
+.bios input,
+.bios textarea,
+.legacy-terminal input,
+.legacy-terminal textarea,
+.system-terminal input,
+.system-terminal textarea {
+  cursor: var(--aos-cursor-text) !important;
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+[aria-disabled="true"],
+[data-aos-cursor="blocked"],
+.aos-cursor-blocked {
+  cursor: var(--aos-cursor-blocked) !important;
+}
+
+[aria-busy="true"],
+.aos-cursor-wait {
+  cursor: var(--aos-cursor-wait) !important;
+}
+
+.loading,
+.aos-loading,
+.aos-cursor-progress {
+  cursor: var(--aos-cursor-progress) !important;
+}
+
+.system-window > header,
+.aos-cursor-move {
+  cursor: var(--aos-cursor-move) !important;
+}
+
+.window-resize-handle,
+.resize-handle,
+.aos-cursor-nwse {
+  cursor: var(--aos-cursor-nwse) !important;
+}
+
+.resize-n,
+.resize-s,
+.resize-ns,
+[data-resize="n"],
+[data-resize="s"],
+.aos-cursor-ns {
+  cursor: var(--aos-cursor-ns) !important;
+}
+
+.resize-e,
+.resize-w,
+.resize-ew,
+[data-resize="e"],
+[data-resize="w"],
+.aos-cursor-ew {
+  cursor: var(--aos-cursor-ew) !important;
+}
+
+.resize-ne,
+.resize-sw,
+[data-resize="ne"],
+[data-resize="sw"],
+.aos-cursor-nesw {
+  cursor: var(--aos-cursor-nesw) !important;
+}
+
+.resize-nw,
+.resize-se,
+[data-resize="nw"],
+[data-resize="se"],
+.aos-cursor-nwse {
+  cursor: var(--aos-cursor-nwse) !important;
+}
+
+.screenshot-selector,
+.aos-cursor-crosshair {
+  cursor: var(--aos-cursor-crosshair) !important;
+}
+
+.paint-app canvas,
+.image-assist canvas,
+.aos-cursor-pen {
+  cursor: var(--aos-cursor-pen) !important;
+}
+
+.desktop #aos-custom-pointer {
+  width: 48px !important;
+  height: 48px !important;
+  top: -6px !important;
+  left: -12px !important;
+  clip-path: none !important;
+  background: url("./assets/cursors/cursor.png") center / contain no-repeat !important;
+  filter: none !important;
+  transform-origin: 12px 6px !important;
+}
+
+.desktop #aos-custom-pointer[data-kind="hand"] {
+  top: -8px !important;
+  left: -16px !important;
+  background-image: url("./assets/cursors/hand.png") !important;
+  transform-origin: 16px 8px !important;
+}
+
+.desktop #aos-custom-pointer[data-kind="text"] {
+  top: -24px !important;
+  left: -24px !important;
+  background-image: url("./assets/cursors/text.png") !important;
+  transform-origin: 24px 24px !important;
+}
+
+.desktop #aos-custom-pointer[data-kind="wait"],
+.desktop #aos-custom-pointer[data-kind="blocked"],
+.desktop #aos-custom-pointer[data-kind="move"],
+.desktop #aos-custom-pointer[data-kind="ns-resize"],
+.desktop #aos-custom-pointer[data-kind="ew-resize"],
+.desktop #aos-custom-pointer[data-kind="nesw-resize"],
+.desktop #aos-custom-pointer[data-kind="nwse-resize"],
+.desktop #aos-custom-pointer[data-kind="crosshair"] {
+  top: -24px !important;
+  left: -24px !important;
+  transform-origin: 24px 24px !important;
+}
+
+.desktop #aos-custom-pointer[data-kind="wait"] { background-image: url("./assets/cursors/wait.png") !important; }
+.desktop #aos-custom-pointer[data-kind="progress"] { background-image: url("./assets/cursors/progress.png") !important; }
+.desktop #aos-custom-pointer[data-kind="blocked"] { background-image: url("./assets/cursors/not-allowed.png") !important; }
+.desktop #aos-custom-pointer[data-kind="move"] { background-image: url("./assets/cursors/move.png") !important; }
+.desktop #aos-custom-pointer[data-kind="ns-resize"] { background-image: url("./assets/cursors/ns-resize.png") !important; }
+.desktop #aos-custom-pointer[data-kind="ew-resize"] { background-image: url("./assets/cursors/ew-resize.png") !important; }
+.desktop #aos-custom-pointer[data-kind="nesw-resize"] { background-image: url("./assets/cursors/nesw-resize.png") !important; }
+.desktop #aos-custom-pointer[data-kind="nwse-resize"] { background-image: url("./assets/cursors/nwse-resize.png") !important; }
+.desktop #aos-custom-pointer[data-kind="crosshair"] { background-image: url("./assets/cursors/crosshair.png") !important; }
+
+.desktop #aos-custom-pointer[data-kind="progress"] {
+  top: -6px !important;
+  left: -12px !important;
+  transform-origin: 12px 6px !important;
+}
+
+.desktop #aos-custom-pointer[data-kind="pen"] {
+  top: -43px !important;
+  left: -14px !important;
+  background-image: url("./assets/cursors/pen.png") !important;
+  transform-origin: 14px 43px !important;
+}
