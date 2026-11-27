@@ -12,7 +12,7 @@ from PIL import Image, ImageChops
 CURSORS = {
     "Cursor.png": "cursor.png",
     "Text cursor.png": "text.png",
-    "Hand.png": "hand.png",
+    "Click.png": "hand.png",
     "Working.png": "wait.png",
     "App working in backgound.png": "progress.png",
     "Blocked.png": "not-allowed.png",
@@ -48,10 +48,15 @@ def resize_premultiplied(image: Image.Image, alpha: Image.Image, size: int) -> I
 
 
 def build_cursor(source: Path, destination: Path, size: int) -> None:
-    image = Image.open(source).convert("RGB")
-    red, green, blue = image.split()
-    minimum = ImageChops.darker(ImageChops.darker(red, green), blue)
-    alpha = minimum.point(lambda value: 0 if value >= 248 else 255)
+    original = Image.open(source).convert("RGBA")
+    image = original.convert("RGB")
+    embedded_alpha = original.getchannel("A")
+    if embedded_alpha.getextrema()[0] < 255:
+        alpha = embedded_alpha
+    else:
+        red, green, blue = image.split()
+        minimum = ImageChops.darker(ImageChops.darker(red, green), blue)
+        alpha = minimum.point(lambda value: 0 if value >= 248 else 255)
     output = resize_premultiplied(image, alpha, size)
     destination.parent.mkdir(parents=True, exist_ok=True)
     output.save(destination, "PNG", optimize=True)
@@ -61,7 +66,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("source", type=Path, help="Folder containing the original cursor PNGs")
     parser.add_argument("output", type=Path, help="Destination folder for transparent cursors")
-    parser.add_argument("--size", type=int, default=64)
+    parser.add_argument("--size", type=int, default=48)
     args = parser.parse_args()
 
     missing = [name for name in CURSORS if not (args.source / name).is_file()]

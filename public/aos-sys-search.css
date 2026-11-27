@@ -1,0 +1,397 @@
+:root {
+  --aos-sys-search-accent: #168fd0;
+  --aos-sys-search-ink: #132638;
+  --aos-sys-search-muted: #62798a;
+  --aos-sys-search-surface: rgba(248, 252, 255, 0.96);
+}
+
+.aos-sys-search {
+  position: fixed;
+  z-index: 2147482000;
+  left: 18px;
+  bottom: 82px;
+  width: min(440px, calc(100vw - 36px));
+  max-height: min(650px, calc(100dvh - 110px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--aos-sys-search-ink);
+  background: var(--aos-sys-search-surface);
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(17, 42, 63, 0.34);
+  backdrop-filter: blur(24px) saturate(1.15);
+  font-family: "TT Norms", "Segoe UI", system-ui, sans-serif;
+}
+
+.aos-sys-search[hidden] {
+  display: none !important;
+}
+
+.aos-sys-search > header,
+.aos-sys-search > footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.aos-sys-search > header {
+  min-height: 54px;
+  border-bottom: 1px solid #d8e5ed;
+}
+
+.aos-sys-search-brand {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.aos-sys-search-brand > img {
+  width: 31px;
+  height: 31px;
+  object-fit: contain;
+}
+
+.aos-sys-search-brand > span {
+  min-width: 0;
+  display: grid;
+}
+
+.aos-sys-search-brand strong {
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.aos-sys-search-brand small,
+.aos-sys-search > footer,
+.aos-sys-search-section > h2,
+.aos-sys-search-result small,
+.aos-sys-search-wikipedia p {
+  color: var(--aos-sys-search-muted);
+}
+
+.aos-sys-search-icon-button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid #d2e0e8;
+  border-radius: 6px;
+  color: #254258;
+  background: #fff;
+  font: 700 18px/1 "Segoe UI Symbol", sans-serif;
+}
+
+.aos-sys-search-icon-button[aria-pressed="true"] {
+  color: #fff;
+  border-color: var(--aos-sys-search-accent);
+  background: var(--aos-sys-search-accent);
+}
+
+.aos-sys-search-field {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 12px;
+  padding: 0 10px;
+  min-height: 46px;
+  border: 1px solid #bdd2df;
+  border-radius: 7px;
+  background: #fff;
+  box-shadow: inset 0 1px 2px rgba(20, 46, 65, 0.05);
+}
+
+.aos-sys-search-field:focus-within {
+  border-color: var(--aos-sys-search-accent);
+  box-shadow: 0 0 0 3px rgba(22, 143, 208, 0.14);
+}
+
+.aos-sys-search-field img {
+  width: 21px;
+  height: 21px;
+  object-fit: contain;
+}
+
+.aos-sys-search-field input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--aos-sys-search-ink);
+  background: transparent;
+  font: inherit;
+}
+
+.aos-sys-search-field kbd {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border: 1px solid #d3e0e7;
+  border-radius: 5px;
+  color: #718796;
+  background: #f3f7f9;
+  font: 700 9px/1.2 inherit;
+}
+
+.aos-sys-search-results {
+  min-height: 150px;
+  overflow: auto;
+  padding: 0 12px 12px;
+}
+
+.aos-sys-search-section + .aos-sys-search-section {
+  margin-top: 14px;
+}
+
+.aos-sys-search-section > h2 {
+  margin: 0 0 6px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.aos-sys-search-result {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--aos-sys-search-ink);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
+.aos-sys-search-result:hover,
+.aos-sys-search-result:focus-visible {
+  outline: 0;
+  background: #e5f3fb;
+}
+
+.aos-sys-search-result > img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.aos-sys-search-result > span {
+  min-width: 0;
+  display: grid;
+}
+
+.aos-sys-search-result b,
+.aos-sys-search-result small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.aos-sys-search-result b {
+  font-size: 13px;
+}
+
+.aos-sys-search-result em {
+  color: #6a8190;
+  font-size: 11px;
+  font-style: normal;
+}
+
+.aos-sys-search-wikipedia {
+  padding: 11px 12px;
+  border-left: 3px solid var(--aos-sys-search-accent);
+  background: #edf7fc;
+}
+
+.aos-sys-search-wikipedia h3,
+.aos-sys-search-wikipedia p {
+  margin: 0;
+}
+
+.aos-sys-search-wikipedia h3 {
+  font-size: 14px;
+}
+
+.aos-sys-search-wikipedia p {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.aos-sys-search-wikipedia button {
+  margin-top: 9px;
+  border: 0;
+  border-radius: 6px;
+  padding: 7px 10px;
+  color: #fff;
+  background: var(--aos-sys-search-accent);
+  font: 700 11px/1.2 inherit;
+}
+
+.aos-sys-search-empty {
+  min-height: 150px;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  color: var(--aos-sys-search-muted);
+  text-align: center;
+}
+
+.aos-sys-search-empty img {
+  width: 44px;
+  height: 44px;
+  margin: auto;
+  object-fit: contain;
+  opacity: 0.78;
+}
+
+.aos-sys-search > footer {
+  justify-content: space-between;
+  border-top: 1px solid #d8e5ed;
+  font-size: 11px;
+}
+
+.aos-sys-search > footer button {
+  border: 0;
+  color: #146f9f;
+  background: transparent;
+  font: 700 11px/1.2 inherit;
+}
+
+.aos-system-statusbar {
+  position: fixed;
+  z-index: 2147481900;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 34px;
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 0 9px;
+  border-bottom: 1px solid rgba(88, 116, 134, 0.34);
+  color: #183046;
+  background: rgba(250, 253, 255, 0.94);
+  box-shadow: 0 5px 18px rgba(20, 45, 64, 0.14);
+  backdrop-filter: blur(18px);
+  font-family: "TT Norms", "Segoe UI", system-ui, sans-serif;
+}
+
+.aos-status-bar-visible .aos-system-statusbar {
+  display: flex;
+}
+
+.aos-system-statusbar > img {
+  width: 23px;
+  height: 23px;
+  margin-right: 5px;
+  object-fit: contain;
+}
+
+.aos-system-statusbar button {
+  height: 28px;
+  border: 0;
+  border-radius: 5px;
+  padding: 0 8px;
+  color: inherit;
+  background: transparent;
+  font: 600 12px/1 inherit;
+}
+
+.aos-system-statusbar button:hover,
+.aos-system-statusbar button:focus-visible {
+  outline: 0;
+  background: #e3f0f7;
+}
+
+.aos-system-statusbar-spacer {
+  flex: 1;
+}
+
+.aos-system-statusbar-output {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #405b6f;
+  font-size: 11px;
+}
+
+.aos-status-bar-visible .aos-sys-search {
+  max-height: min(650px, calc(100dvh - 144px));
+}
+
+.desktop.shelf-top + .aos-sys-search,
+.shelf-top .aos-sys-search {
+  top: 78px;
+  bottom: auto;
+}
+
+.desktop.shelf-left .aos-sys-search {
+  left: 96px;
+  bottom: 18px;
+}
+
+.desktop.shelf-right .aos-sys-search {
+  right: 96px;
+  left: auto;
+  bottom: 18px;
+}
+
+.dark-mode .aos-sys-search,
+.dark-mode .aos-system-statusbar {
+  color: #edf7fc;
+  border-color: #ffffff1c;
+  background: rgba(13, 27, 39, 0.95);
+}
+
+.dark-mode .aos-sys-search-field,
+.dark-mode .aos-sys-search-icon-button {
+  color: #edf7fc;
+  border-color: #ffffff26;
+  background: #172d3d;
+}
+
+.dark-mode .aos-sys-search-field input {
+  color: #edf7fc;
+}
+
+.dark-mode .aos-sys-search-result {
+  color: #edf7fc;
+}
+
+.dark-mode .aos-sys-search-result:hover,
+.dark-mode .aos-sys-search-result:focus-visible,
+.dark-mode .aos-system-statusbar button:hover,
+.dark-mode .aos-system-statusbar button:focus-visible {
+  background: #203c50;
+}
+
+.dark-mode .aos-sys-search-wikipedia {
+  background: #173448;
+}
+
+@media (max-width: 600px) {
+  .aos-sys-search {
+    left: 8px;
+    right: 8px;
+    bottom: 72px;
+    width: auto;
+    max-height: calc(100dvh - 94px);
+  }
+
+  .aos-sys-search-field kbd,
+  .aos-system-statusbar button[data-status-action="edit"] {
+    display: none;
+  }
+
+  .aos-system-statusbar {
+    overflow-x: auto;
+  }
+}

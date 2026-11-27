@@ -1,0 +1,25 @@
+[Unit]
+Description=A-OS FileDrop local-network transfer service
+After=local-fs.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+Environment=AOS_FILEDROP_NATIVE=1
+Environment="AOS_FILEDROP_DEFAULT_NAME=A-OS Computer"
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/a-os/filedrop/filedrop_service.py --state-dir /var/lib/aos/filedrop --downloads /var/lib/aos/filedrop/Downloads
+Restart=on-failure
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+StateDirectory=aos
+StateDirectoryMode=0755
+ReadWritePaths=/var/lib/aos
+
+[Install]
+WantedBy=multi-user.target

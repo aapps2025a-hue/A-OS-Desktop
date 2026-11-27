@@ -537,6 +537,7 @@ class FileDropService:
                     self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-File-Name, X-File-Sha256")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+                self.send_header("Access-Control-Allow-Private-Network", "true")
 
             def _json(self, status: int, payload: dict[str, Any]) -> None:
                 data = json.dumps(payload, separators=(",", ":")).encode("utf-8")

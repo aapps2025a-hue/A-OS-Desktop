@@ -101,7 +101,7 @@
     return '<div class="aos-os-center-runtime">' +
       '<header class="aos-os-center-hero"><img src="/assets/icons/OS Logo.png" alt=""><div><small>A-OS SYSTEM</small><h1>A-OS Operating System Center</h1><p>Manage this A-OS installation, verify protection, and open system services.</p></div></header>' +
       '<main class="aos-os-center-main">' +
-        '<section class="aos-os-center-status"><article class="aos-os-center-card"><span>OPERATIONAL</span><b>System status</b><p>A-OS Desktop is running normally.</p></article><article class="aos-os-center-card"><span>ACTIVE</span><b>Security service</b><p>Real-time scanning is enabled.</p></article><article class="aos-os-center-card"><span>CURRENT</span><b>Release channel</b><p>A-OS 3.0 stable.</p></article></section>' +
+        '<section class="aos-os-center-status"><article class="aos-os-center-card"><span>OPERATIONAL</span><b>System status</b><p>A-OS Desktop is running normally.</p></article><article class="aos-os-center-card"><span>ACTIVE</span><b>Security service</b><p>Real-time scanning is enabled.</p></article><article class="aos-os-center-card"><span>CURRENT</span><b>Release channel</b><p>A-OS 3.5 stable.</p></article></section>' +
         '<section class="aos-os-center-section"><small>DEVICE ACTIONS</small><h2>System tools</h2><div class="aos-os-center-actions"><button type="button" data-os-center-action="updates">Check for updates</button><button type="button" class="secondary" data-os-center-action="files">Open Files</button><a class="secondary" href="https://a-os-tv.web.app" target="_blank" rel="noopener">Open A-OS TV</a></div><p class="aos-os-center-result" data-os-center-result>OS Center is ready.</p></section>' +
         '<section class="aos-os-center-section"><small>ABOUT THIS DEVICE</small><h2>Complete A-OS environment</h2><p>A-OS Files, Security, A-Store, OSInternet, desktop apps, profiles, and device settings are available from this installation.</p></section>' +
       '</main></div>';
@@ -167,7 +167,7 @@
       document.title = "A-OS is hibernating";
       screen.querySelector("button").addEventListener("click", function () {
         localStorage.removeItem(POWER_STATE_KEY);
-        document.title = "A-OS Desktop 3.0";
+        document.title = "A-OS Desktop 3.5";
         screen.remove();
       });
       return;
@@ -247,7 +247,7 @@
     if (document.querySelector('link[href*="aos-cursors.css"]')) return;
     var stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./aos-cursors.css?v=20261121-cursors1";
+    stylesheet.href = "./aos-cursors.css?v=20261127-cursors3";
     document.head.appendChild(stylesheet);
   }
 
@@ -257,40 +257,94 @@
     installCursorStyles();
   }
 
-  function resizeKind(element) {
-    var value = [
-      element.getAttribute("data-resize") || "",
-      element.getAttribute("data-direction") || "",
-      typeof element.className === "string" ? element.className : ""
-    ].join(" ").toLowerCase();
-    if (/nesw|resize-ne|resize-sw|\bne\b|\bsw\b/.test(value)) return "nesw-resize";
-    if (/nwse|resize-nw|resize-se|\bnw\b|\bse\b/.test(value)) return "nwse-resize";
-    if (/resize-ns|resize-n|resize-s|\bns\b/.test(value)) return "ns-resize";
-    if (/resize-ew|resize-e|resize-w|\bew\b/.test(value)) return "ew-resize";
-    return "nwse-resize";
+  var DEFAULT_CURSOR_COLOUR = "#169bd5";
+  var baseCursor = new Image();
+  var cursorReady = false;
+
+  if (!localStorage.getItem("aos-pointer-colour")) {
+    localStorage.setItem("aos-pointer-colour", DEFAULT_CURSOR_COLOUR);
   }
 
-  function cursorKind(target) {
-    if (!(target instanceof Element)) return "arrow";
-    if (target.closest("button:disabled,input:disabled,select:disabled,[aria-disabled='true'],[data-aos-cursor='blocked']")) return "blocked";
-    if (target.closest("[aria-busy='true'],.aos-cursor-wait")) return "wait";
-    if (target.closest(".loading,.aos-loading,.aos-cursor-progress")) return "progress";
-    if (target.closest(".paint-app canvas,.image-assist canvas,.aos-cursor-pen")) return "pen";
-    if (target.closest(".screenshot-selector,.aos-cursor-crosshair")) return "crosshair";
-    var resize = target.closest(".window-resize-handle,.resize-handle,[data-resize],[data-direction^='resize']");
-    if (resize) return resizeKind(resize);
-    if (target.closest(".system-window>header,.aos-cursor-move")) return "move";
-    if (target.closest("input:not([type='checkbox']):not([type='radio']):not([type='range']),textarea,[contenteditable='true']")) return "text";
-    if (target.closest("button,a,label,select,summary,[role='button'],[draggable='true']")) return "hand";
-    return "arrow";
+  function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
   }
 
-  window.addEventListener("pointermove", function (event) {
-    var target = event.target;
-    queueMicrotask(function () {
-      var pointer = document.getElementById("aos-custom-pointer");
-      if (!pointer) return;
-      pointer.dataset.kind = cursorKind(target);
+  function pointerSetting(name, fallback) {
+    var inline = document.documentElement.style.getPropertyValue(name).trim();
+    return inline || fallback;
+  }
+
+  function drawPointer(size, shape, colour, tintArtwork) {
+    var canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext("2d");
+    var hotspot = {x: Math.round(size / 2), y: Math.round(size / 2)};
+
+    if (shape === "dot") {
+      context.fillStyle = colour;
+      context.beginPath();
+      context.arc(size / 2, size / 2, Math.max(4, size * 0.18), 0, Math.PI * 2);
+      context.fill();
+    } else if (shape === "ring") {
+      context.strokeStyle = colour;
+      context.lineWidth = Math.max(3, size * 0.09);
+      context.beginPath();
+      context.arc(size / 2, size / 2, Math.max(5, size * 0.22), 0, Math.PI * 2);
+      context.stroke();
+    } else {
+      context.drawImage(baseCursor, 0, 0, size, size);
+      if (tintArtwork && colour.toLowerCase() !== DEFAULT_CURSOR_COLOUR) {
+        context.globalCompositeOperation = "source-atop";
+        context.globalAlpha = 0.68;
+        context.fillStyle = colour;
+        context.fillRect(0, 0, size, size);
+        context.globalAlpha = 1;
+        context.globalCompositeOperation = "source-over";
+      }
+      hotspot = {x: Math.round(size * 0.25), y: Math.round(size * 0.125)};
+    }
+    return {url: canvas.toDataURL("image/png"), hotspot: hotspot};
+  }
+
+  function applyNativeCursor() {
+    if (!cursorReady) return;
+    var scale = clamp(Number(pointerSetting("--pointer-size", localStorage.getItem("aos-pointer-size") || "1")) || 1, 0.7, 2);
+    var colour = pointerSetting("--pointer-colour", localStorage.getItem("aos-pointer-colour") || DEFAULT_CURSOR_COLOUR);
+    var shape = document.documentElement.dataset.pointer || localStorage.getItem("aos-pointer-image") || "arrow";
+    if (["arrow", "dot", "ring"].indexOf(shape) === -1) shape = "arrow";
+
+    var pointer = drawPointer(clamp(Math.round(48 * scale), 32, 96), shape, colour, true);
+    var preview = drawPointer(48, shape, colour, true);
+    var cursorValue = 'url("' + pointer.url + '") ' + pointer.hotspot.x + " " + pointer.hotspot.y + ", default";
+    var previewValue = 'url("' + preview.url + '")';
+    if (document.documentElement.style.getPropertyValue("--aos-cursor-arrow") !== cursorValue) {
+      document.documentElement.style.setProperty("--aos-cursor-arrow", cursorValue);
+    }
+    if (document.documentElement.style.getPropertyValue("--aos-cursor-preview") !== previewValue) {
+      document.documentElement.style.setProperty("--aos-cursor-preview", previewValue);
+    }
+  }
+
+  baseCursor.addEventListener("load", function () {
+    cursorReady = true;
+    applyNativeCursor();
+  }, {once: true});
+  baseCursor.src = new URL("./assets/cursors/cursor.png", document.baseURI).href;
+
+  var cursorUpdatePending = false;
+  function scheduleCursorUpdate() {
+    if (cursorUpdatePending) return;
+    cursorUpdatePending = true;
+    window.requestAnimationFrame(function () {
+      cursorUpdatePending = false;
+      applyNativeCursor();
     });
-  }, {passive: true});
+  }
+
+  new MutationObserver(scheduleCursorUpdate).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["style", "data-pointer"]
+  });
+  window.addEventListener("storage", scheduleCursorUpdate);
 })();

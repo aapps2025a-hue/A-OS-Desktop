@@ -76,7 +76,7 @@
   min-height: 72px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--astore-line);
-  background: color-mix(in srgb, var(--astore-panel-solid) 86%, transparent);
+  background: var(--astore-panel);
   backdrop-filter: blur(22px) saturate(150%);
 }
 
@@ -182,7 +182,7 @@
 }
 
 .astore-account-button.signed-in {
-  border-color: color-mix(in srgb, var(--astore-good) 55%, var(--astore-line));
+  border-color: var(--astore-good);
 }
 
 .astore-button,
@@ -209,7 +209,7 @@
 
 .astore-button:hover,
 .astore-shell button:hover {
-  border-color: color-mix(in srgb, var(--astore-accent) 55%, var(--astore-line));
+  border-color: var(--astore-accent);
 }
 
 .astore-button.primary,
@@ -237,7 +237,7 @@
   padding: 10px 12px;
   border-left: 3px solid var(--astore-accent);
   color: var(--astore-muted);
-  background: color-mix(in srgb, var(--astore-accent) 8%, transparent);
+  background: rgba(7, 134, 200, 0.08);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -531,7 +531,7 @@
 }
 
 .astore-app-instance.astore-window-active > section {
-  border-color: color-mix(in srgb, var(--astore-accent) 52%, #fff);
+  border-color: var(--astore-accent);
 }
 
 .astore-dialog,
@@ -540,7 +540,7 @@
   width: min(940px, 96vw);
   max-height: min(820px, 94vh);
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--astore-line) 60%, #fff);
+  border: 1px solid var(--astore-line);
   border-radius: 8px;
   color: var(--astore-text);
   background: var(--astore-panel-solid);
@@ -704,14 +704,14 @@
 .astore-review-box {
   margin: 18px 0;
   padding: 13px;
-  border: 1px solid color-mix(in srgb, var(--astore-warn) 45%, var(--astore-line));
+  border: 1px solid var(--astore-warn);
   border-radius: 7px;
-  background: color-mix(in srgb, var(--astore-warn) 8%, transparent);
+  background: rgba(168, 100, 8, 0.08);
 }
 
 .astore-review-box.safe {
-  border-color: color-mix(in srgb, var(--astore-good) 45%, var(--astore-line));
-  background: color-mix(in srgb, var(--astore-good) 8%, transparent);
+  border-color: var(--astore-good);
+  background: rgba(22, 132, 91, 0.08);
 }
 
 .astore-review-box strong,
@@ -764,7 +764,7 @@
 .astore-dev-files,
 .astore-dev-publish {
   padding: 14px;
-  background: color-mix(in srgb, var(--astore-bg) 74%, var(--astore-panel-solid));
+  background: var(--astore-bg);
 }
 
 .astore-dev-files {
@@ -806,7 +806,7 @@
 
 .astore-file-row.active {
   border-color: var(--astore-accent) !important;
-  background: color-mix(in srgb, var(--astore-accent) 12%, var(--astore-panel)) !important;
+  background: var(--astore-panel) !important;
 }
 
 .astore-file-row img {

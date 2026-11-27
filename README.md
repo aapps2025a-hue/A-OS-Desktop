@@ -11,8 +11,8 @@ desktop.
 
 ## New Stuff
 
-We have added some new options and fixed patches in V3.1. As well as
-making it a better experience and making a `.iso`
+A-OS 3.5 adds screenshot cropping and painting, FileDrop downloads, a native
+Debian terminal, Linux-backed files, and a consistent classic window style.
 ## Run locally
 
 Serve the `public` folder with any static web server. For example:
@@ -99,7 +99,7 @@ it does not modify the Firebase build.
 The open-source Debian Live configuration is in `iso`. GitHub Actions builds a
 real ISO-hybrid image that starts the packaged A-OS interface directly and
 serves this exact `public` folder locally, including the same A-OS boot GIF.
-The generated ISO and SHA-256 checksum are published in the `iso-v3.0.0`
+The generated ISO and SHA-256 checksum are published in the `iso-v3.5.0`
 GitHub release. The release is blocked unless both the USB image and a generated
 installed UEFI disk boot to the packaged A-OS HTML in QEMU.
 

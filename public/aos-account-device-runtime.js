@@ -354,9 +354,9 @@
   function enhanceTerminalVersion() {
     document.querySelectorAll(".system-terminal").forEach(function (terminal) {
       var title = terminal.querySelector("header b, header strong");
-      if (title && /^A-OS Terminal(?:\s+[\d.]+)?$/i.test((title.textContent || "").trim())) title.textContent = "A-OS Terminal 2.4";
+      if (title && /^A-OS Terminal(?:\s+[\d.]+)?$/i.test((title.textContent || "").trim())) title.textContent = "A-OS Terminal 3.5";
       terminal.querySelectorAll("main div").forEach(function (line) {
-        if (/A-OS Terminal 1\.0/i.test(line.textContent || "")) line.textContent = (line.textContent || "").replace(/A-OS Terminal 1\.0/gi, "A-OS Terminal 2.4");
+        if (/A-OS Terminal (?:1\.0|2\.4)/i.test(line.textContent || "")) line.textContent = (line.textContent || "").replace(/A-OS Terminal (?:1\.0|2\.4)/gi, "A-OS Terminal 3.5");
       });
     });
   }

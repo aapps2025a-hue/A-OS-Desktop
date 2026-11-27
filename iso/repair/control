@@ -1,5 +1,5 @@
 Package: aos-network-repair
-Version: 3.0.0-20261021
+Version: 3.5.0-20261127
 Architecture: all
 Maintainer: A-OS Project
 Depends: python3, network-manager, systemd-timesyncd, ca-certificates, rfkill

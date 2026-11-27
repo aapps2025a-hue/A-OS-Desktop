@@ -7,10 +7,14 @@ from urllib.request import Request, urlopen
 from urllib.error import URLError, HTTPError
 from urllib.parse import urlparse
 import hashlib
+import base64
+import binascii
 import json
 import math
+import mimetypes
 import os
 import re
+import shlex
 import shutil
 import socket
 import ssl
@@ -32,7 +36,9 @@ SOURCE_ARCHIVE_URL = "https://github.com/aapps2025a-hue/A-OS-Desktop/archive/{re
 CONNECTIVITY_HOST = "connectivitycheck.gstatic.com"
 CONNECTIVITY_URL = "https://connectivitycheck.gstatic.com/generate_204"
 NATIVE_SERVER_PATH = Path(os.environ.get("AOS_NATIVE_SERVER_PATH", "/usr/local/lib/aos/server.py")).resolve()
-MAX_BODY = 256 * 1024
+MAX_BODY = 16 * 1024 * 1024
+MAX_NATIVE_FILE_BYTES = 12 * 1024 * 1024
+MAX_NATIVE_IMPORT_BYTES = 24 * 1024 * 1024
 COMMAND_TIMEOUT = 12
 VERSION_CACHE_SECONDS = 30
 VERSION_CACHE = {"at": 0.0, "value": None}
@@ -224,7 +230,7 @@ def remote_version(force=False):
             return VERSION_CACHE["value"]
         value = None
         try:
-            request = Request(REMOTE_VERSION_URL, headers={"User-Agent": "A-OS-Desktop/3.0"})
+            request = Request(REMOTE_VERSION_URL, headers={"User-Agent": "A-OS-Desktop/3.5"})
             with urlopen(request, timeout=8) as response:
                 value = json.loads(response.read(64 * 1024).decode("utf-8"))
         except Exception:
@@ -263,7 +269,9 @@ def run_as_aos(command, timeout=COMMAND_TIMEOUT):
     if code != 0 or not uid.isdigit():
         return code or 1, "", error or "The A-OS audio session is not available"
     return run([
-        "runuser", "-u", "aos", "--", "env", "XDG_RUNTIME_DIR=/run/user/" + uid,
+        "runuser", "-u", "aos", "--", "env",
+        "HOME=/home/aos", "USER=aos", "LOGNAME=aos", "XDG_RUNTIME_DIR=/run/user/" + uid,
+        "PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games",
         *command,
     ], timeout=timeout)
 
@@ -493,7 +501,7 @@ def device_info():
         "ip": address,
         "device": hostname,
         "processor": processor,
-        "os": "A-OS Desktop " + str(release.get("version") or "3.0"),
+        "os": "A-OS Desktop " + str(release.get("version") or "3.5"),
     }
 
 
@@ -520,6 +528,170 @@ def run_python(code):
             os.unlink(path)
         except OSError:
             pass
+
+
+def run_terminal_command(command, cwd=None):
+    value = str(command or "").strip()
+    if not value:
+        raise RuntimeError("Enter a Debian command")
+    if len(value.encode("utf-8")) > 8192 or "\x00" in value:
+        raise RuntimeError("That command is too long")
+    home = Path("/home/aos").resolve()
+    requested = Path(str(cwd or home)).expanduser()
+    try:
+        requested = requested.resolve(strict=False)
+    except (OSError, RuntimeError):
+        requested = home
+    if requested != home and home not in requested.parents:
+        requested = home
+    if not requested.is_dir():
+        requested = home
+    marker = "__AOS_TERMINAL_CWD_" + hashlib.sha256(os.urandom(24)).hexdigest()[:18] + "__"
+    script = (
+        "cd -- " + shlex.quote(str(requested)) + " || exit 1\n" +
+        value + "\n" +
+        "aos_status=$?\n" +
+        "printf '\\n" + marker + "%s\\n' \"$PWD\"\n" +
+        "exit $aos_status\n"
+    )
+    exit_code, output, error = run_as_aos(
+        ["bash", "--noprofile", "--norc", "-c", script], timeout=45
+    )
+    next_cwd = str(requested)
+    marker_index = output.rfind("\n" + marker)
+    if marker_index >= 0:
+        next_cwd = output[marker_index + len(marker) + 1:].strip() or next_cwd
+        output = output[:marker_index].rstrip()
+    return {
+        "ok": True,
+        "exitCode": exit_code,
+        "output": output[-131072:],
+        "error": error[-131072:],
+        "cwd": next_cwd,
+    }
+
+
+def native_file_icon(name, mime):
+    extension = Path(name).suffix.lower()
+    if str(mime).startswith("image/"):
+        return "Images.png"
+    if str(mime).startswith("audio/"):
+        return "Music.png"
+    if str(mime).startswith("video/"):
+        return "Video.png"
+    if extension == ".iso":
+        return "ISO.png"
+    if extension in {".zip", ".tar", ".gz", ".xz", ".7z"}:
+        return "zip.png"
+    if extension in {".py", ".js", ".html", ".css", ".json", ".sh"}:
+        return "Code.png"
+    return "Text Editor.png"
+
+
+def native_path_id(relative, folder=False):
+    prefix = "native-dir-" if folder else "native-file-"
+    return prefix + hashlib.sha256(str(relative).encode("utf-8")).hexdigest()[:24]
+
+
+def native_files_snapshot():
+    home = Path("/home/aos").resolve()
+    roots = (("Desktop", "root"), ("Documents", "documents"), ("Downloads", "downloads"))
+    entries = []
+    imported = 0
+    for folder_name, parent_id in roots:
+        root = home / folder_name
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        for path in sorted(root.rglob("*"), key=lambda item: str(item).lower())[:500]:
+            try:
+                if path.is_symlink() or any(part.startswith(".") for part in path.relative_to(home).parts):
+                    continue
+                relative = path.relative_to(home).as_posix()
+                nested_parent = path.parent.relative_to(root)
+                entry_parent = parent_id if str(nested_parent) == "." else native_path_id((Path(folder_name) / nested_parent).as_posix(), True)
+                if path.is_dir():
+                    entries.append({
+                        "id": native_path_id(relative, True), "name": path.name, "type": "folder",
+                        "parent": entry_parent, "content": "", "icon": "Files.png", "mime": "inode/directory",
+                        "nativePath": relative, "native": True,
+                    })
+                    continue
+                if not path.is_file():
+                    continue
+                size = path.stat().st_size
+                mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+                content = ""
+                native_only = True
+                if size <= MAX_NATIVE_FILE_BYTES and imported + size <= MAX_NATIVE_IMPORT_BYTES:
+                    raw = path.read_bytes()
+                    imported += len(raw)
+                    if mime.startswith("text/") or path.suffix.lower() in {".md", ".json", ".js", ".css", ".py", ".sh", ".html", ".xml", ".csv"}:
+                        content = raw.decode("utf-8", errors="replace")
+                    else:
+                        content = "data:" + mime + ";base64," + base64.b64encode(raw).decode("ascii")
+                    native_only = False
+                entries.append({
+                    "id": native_path_id(relative), "name": path.name, "type": "file",
+                    "parent": entry_parent, "content": content, "icon": native_file_icon(path.name, mime),
+                    "mime": mime, "size": size, "nativePath": relative, "native": True,
+                    "nativeOnly": native_only,
+                })
+            except (OSError, ValueError):
+                continue
+    return {"ok": True, "root": str(home), "files": entries}
+
+
+def safe_native_destination(body):
+    home = Path("/home/aos").resolve()
+    supplied = str(body.get("nativePath") or "").strip().replace("\\", "/")
+    if supplied:
+        destination = (home / supplied).resolve(strict=False)
+    else:
+        parent = str(body.get("parent") or "root")
+        folder = {"root": "Desktop", "desktop": "Desktop", "documents": "Documents", "downloads": "Downloads"}.get(parent, "Documents")
+        name = Path(str(body.get("name") or "Untitled").replace("\\", "/")).name.strip()
+        name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).rstrip(" .")[:240] or "Untitled"
+        destination = (home / folder / name).resolve(strict=False)
+    if destination == home or home not in destination.parents:
+        raise RuntimeError("A-OS Files can only write inside your Linux home folder")
+    return home, destination
+
+
+def write_native_file(body):
+    home, destination = safe_native_destination(body)
+    if str(body.get("type") or "file") == "folder":
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+            shutil.chown(destination, user="aos", group="aos")
+            shutil.chown(destination.parent, user="aos", group="aos")
+        except OSError as error:
+            raise RuntimeError("A-OS could not create that Linux folder") from error
+        return {"ok": True, "path": destination.relative_to(home).as_posix(), "size": 0}
+    content = str(body.get("content") or "")
+    if content.startswith("data:"):
+        comma = content.find(",")
+        if comma < 0 or ";base64" not in content[:comma].lower():
+            raise RuntimeError("That file data is not supported")
+        try:
+            raw = base64.b64decode(content[comma + 1:], validate=True)
+        except (binascii.Error, ValueError) as error:
+            raise RuntimeError("That file data is damaged") from error
+    else:
+        raw = content.encode("utf-8")
+    if len(raw) > MAX_NATIVE_FILE_BYTES:
+        raise RuntimeError("A-OS Files can mirror files up to 12 MB")
+    try:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name("." + destination.name + ".aos-pending")
+        temporary.write_bytes(raw)
+        os.replace(temporary, destination)
+        shutil.chown(destination, user="aos", group="aos")
+        shutil.chown(destination.parent, user="aos", group="aos")
+    except OSError as error:
+        raise RuntimeError("A-OS could not save that Linux file") from error
+    return {"ok": True, "path": destination.relative_to(home).as_posix(), "size": len(raw)}
 
 
 def split_nmcli(line):
@@ -1374,7 +1546,7 @@ if loadfont unicode; then
     terminal_output gfxterm
 fi
 
-menuentry 'A-OS Desktop 3.0' {
+menuentry 'A-OS Desktop 3.5' {
     search --no-floppy --fs-uuid --set=aosroot %s
     linux ($aosroot)/live/vmlinuz boot=live components persistence live-media=/dev/disk/by-uuid/%s live-media-path=/live quiet splash reboot=efi loglevel=3 systemd.show_status=false rd.systemd.show_status=false udev.log_priority=3 rd.udev.log_level=3 logo.nologo plymouth.ignore-serial-consoles vt.global_cursor_default=0 nox11autologin username=aos hostname=a-os locales=en_GB.UTF-8 keyboard-layouts=gb timezone=Europe/London console=ttyS0,115200n8 noeject
     initrd ($aosroot)/live/initrd.img
@@ -1622,7 +1794,7 @@ def install_erase_worker(target):
         mounted.clear()
         shutil.rmtree(mount_root, ignore_errors=True)
         mount_root = None
-        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100, message="A-OS 3.0 is installed with a universal UEFI fallback loader. Remove the USB and restart.")
+        set_job_state(INSTALL_STATE, INSTALL_LOCK, running=False, stage="complete", progress=100, message="A-OS 3.5 is installed with a universal UEFI fallback loader. Remove the USB and restart.")
     except Exception as error:
         for path in reversed(mounted):
             run(["umount", str(path)], timeout=15)
@@ -1839,6 +2011,7 @@ class AosHandler(SimpleHTTPRequestHandler):
                 "/__aos/storage": storage_targets,
                 "/__aos/partitions/a-os": aos_partition_state,
                 "/__aos/linux/apps": linux_applications,
+                "/__aos/files": native_files_snapshot,
                 "/__aos/network/check": lambda: network_health(force=True),
                 "/__aos/wifi/scan": wifi_scan,
                 "/__aos/bluetooth/scan": bluetooth_scan,
@@ -1898,6 +2071,18 @@ class AosHandler(SimpleHTTPRequestHandler):
         if route == "/__aos/linux/launch":
             try:
                 self._json(200, launch_linux_application(body.get("id")))
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
+            return
+        if route == "/__aos/terminal":
+            try:
+                self._json(200, run_terminal_command(body.get("command"), body.get("cwd")))
+            except RuntimeError as error:
+                self._json(400, {"ok": False, "error": str(error)})
+            return
+        if route == "/__aos/files/write":
+            try:
+                self._json(200, write_native_file(body))
             except RuntimeError as error:
                 self._json(400, {"ok": False, "error": str(error)})
             return

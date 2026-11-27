@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">FileDrop</title>
+  <defs>
+    <linearGradient id="bg" x1="70" y1="52" x2="444" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27c9b8"/>
+      <stop offset="0.54" stop-color="#3478ee"/>
+      <stop offset="1" stop-color="#4451c5"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#10245f" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="98" fill="url(#bg)"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)">
+    <rect x="92" y="117" width="153" height="214" rx="27" stroke-width="25"/>
+    <rect x="267" y="181" width="153" height="214" rx="27" stroke-width="25"/>
+    <path d="M176 263h142m-40-42 44 42-44 42" stroke-width="29"/>
+  </g>
+  <circle cx="168" cy="300" r="9" fill="#fff"/>
+  <circle cx="344" cy="365" r="9" fill="#fff"/>
+</svg>

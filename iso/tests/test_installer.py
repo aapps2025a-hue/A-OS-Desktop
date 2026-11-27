@@ -348,7 +348,7 @@ Boot0001* Windows Boot Manager HD(1,GPT,12345678-1234-4abc-9def-1234567890ab,0x8
 
     def test_standalone_grub_uses_aos_3_system_uuid_only(self):
         config = SERVER.standalone_grub_configuration("aos-system-uuid")
-        self.assertIn("menuentry 'A-OS Desktop 3.0'", config)
+        self.assertIn("menuentry 'A-OS Desktop 3.5'", config)
         self.assertIn("live-media=/dev/disk/by-uuid/aos-system-uuid", config)
         self.assertIn("($aosroot)/live/vmlinuz", config)
         self.assertNotIn("Windows Boot Manager", config)
@@ -461,6 +461,16 @@ Boot0007* A-OS
         session = (config / "includes.chroot/etc/skel/.xinitrc").read_text()
         self.assertIn("connectivitycheck.gstatic.com/generate_204", session)
         self.assertNotIn("a-os-desktop.web.app/version.json", session)
+
+    def test_iso_packages_and_enables_filedrop(self):
+        config = REPOSITORY / "iso/config"
+        service = (config / "includes.chroot/etc/systemd/system/aos-filedrop.service").read_text()
+        hook = (config / "hooks/live/0100-aos-permissions.hook.chroot").read_text()
+        workflow = (REPOSITORY / ".github/workflows/build-iso.yml").read_text()
+        self.assertIn("/opt/a-os/filedrop/filedrop_service.py", service)
+        self.assertIn("AOS_FILEDROP_NATIVE=1", service)
+        self.assertIn("systemctl enable aos-filedrop.service", hook)
+        self.assertIn("cp filedrop/__init__.py filedrop/filedrop_service.py", workflow)
 
     def test_volume_state_reads_pipewire_default_sink(self):
         with patch.object(SERVER, "run_as_aos", return_value=(0, "Volume: 0.65 [MUTED]", "")):
@@ -616,6 +626,23 @@ Boot0007* A-OS
     def test_native_hibernate_dialog_uses_session_saving_bridge(self):
         runtime = (REPOSITORY / "public/aos-live-native-runtime.js").read_text(encoding="utf-8")
         self.assertIn('window.aosPowerBridge.perform(action)', runtime)
+
+    def test_terminal_runs_debian_commands_as_the_unprivileged_aos_user(self):
+        def terminal_result(command, timeout):
+            marker = next(part for part in command[-1].splitlines() if part.startswith("printf '\\n__AOS_TERMINAL_CWD_"))
+            marker = marker.split("\\n", 1)[1].split("%s", 1)[0]
+            return 0, "hello\n" + marker + "/home/aos/Documents", ""
+
+        with patch.object(SERVER, "run_as_aos", side_effect=terminal_result) as runner:
+            result = SERVER.run_terminal_command("printf hello")
+        self.assertEqual(result["exitCode"], 0)
+        self.assertEqual(result["output"], "hello")
+        self.assertEqual(result["cwd"], "/home/aos/Documents")
+        self.assertEqual(runner.call_args.args[0][:3], ["bash", "--noprofile", "--norc"])
+
+    def test_linux_file_bridge_rejects_paths_outside_the_aos_home(self):
+        with self.assertRaisesRegex(RuntimeError, "Linux home folder"):
+            SERVER.safe_native_destination({"nativePath": "../etc/passwd", "name": "passwd"})
 
 
 if __name__ == "__main__":

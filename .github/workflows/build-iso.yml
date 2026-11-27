@@ -7,6 +7,7 @@ on:
     paths:
       - "iso/**"
       - "public/**"
+      - "filedrop/**"
       - "scripts/smoke-apps.mjs"
       - ".github/workflows/build-iso.yml"
 
@@ -39,7 +40,9 @@ jobs:
           sudo dpkg -i /tmp/live-build.deb
 
       - name: Test installer safety logic
-        run: python3 -m unittest discover -s iso/tests -v
+        run: |
+          python3 -m unittest discover -s iso/tests -v
+          python3 -m unittest filedrop.tests.test_filedrop -v
 
       - name: Test real NTFS resizing on a disposable disk
         run: sudo python3 iso/tests/integration_partition.py
@@ -50,6 +53,9 @@ jobs:
           rm -rf iso/config/includes.chroot/opt/a-os/public
           mkdir -p iso/config/includes.chroot/opt/a-os/public
           cp -a public/. iso/config/includes.chroot/opt/a-os/public/
+          rm -rf iso/config/includes.chroot/opt/a-os/filedrop
+          mkdir -p iso/config/includes.chroot/opt/a-os/filedrop
+          cp filedrop/__init__.py filedrop/filedrop_service.py iso/config/includes.chroot/opt/a-os/filedrop/
 
       - name: Launch the packaged A-OS apps in Chrome
         run: |
@@ -243,14 +249,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view iso-v3.0.0 >/dev/null 2>&1; then
-            gh release create iso-v3.0.0 \
-              --title "A-OS Desktop 3.0 bootable installer"
+          if ! gh release view iso-v3.5.0 >/dev/null 2>&1; then
+            gh release create iso-v3.5.0 \
+              --title "A-OS Desktop 3.5 bootable installer"
           fi
-          gh release edit iso-v3.0.0 \
-            --title "A-OS Desktop 3.0 bootable installer" \
-            --notes "A-OS Desktop 3.0 boots the packaged A-OS HTML, copies the live USB system into RAM so the installer can be removed after startup, supports a full-disk UEFI installation with a universal fallback loader, and keeps persistent files and settings. Native updates now survive a closed panel, reconnect and resume after a network interruption, recover after a service restart, and delay power actions until installation is safe. It also includes NetworkManager Wi-Fi repair, improved BlueZ Bluetooth, Family Device, Python execution, and the A-OS command line. Publication requires both the USB image and a no-USB installed UEFI disk to boot in QEMU until A-OS HTML executes."
-          gh release upload iso-v3.0.0 \
+          gh release edit iso-v3.5.0 \
+            --title "A-OS Desktop 3.5 bootable installer" \
+            --notes "A-OS Desktop 3.5 adds Ctrl+S screenshot cropping and painting, a consistent classic A-OS window style, improved FileDrop access, Linux-backed A-OS Files, and unprivileged Debian commands in A-OS Terminal. It boots the packaged A-OS HTML, supports full-disk and alongside-Windows UEFI installation, and keeps persistent files and settings. Publication requires both the USB image and a no-USB installed UEFI disk to boot in QEMU until A-OS HTML executes."
+          gh release upload iso-v3.5.0 \
             A-OS-Desktop-amd64.iso \
             A-OS-Desktop-amd64.iso.sha256 \
             A-OS-Network-Repair-20261021.deb \

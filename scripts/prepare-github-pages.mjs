@@ -31,7 +31,7 @@ walk(fileURLToPath(output));
 writeFileSync(
   new URL("version.json", output),
   JSON.stringify({
-    version: "3.0.0",
+    version: "3.5.0",
     build: new Date().toISOString(),
     revision: process.env.GITHUB_SHA || "github-pages"
   }, null, 2) + "\n"

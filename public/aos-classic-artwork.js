@@ -74,7 +74,18 @@
   }
 
   function removeEmojiSettings(root) {
-    // Emoji pack settings are part of the classic A-OS experience again.
+    var scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll("h1, h2, h3, h4, b").forEach(function (heading) {
+      if (heading.textContent.trim().toLowerCase() !== "system emoji pack") return;
+      var container = heading.parentElement;
+      for (var depth = 0; container && depth < 7; depth += 1, container = container.parentElement) {
+        var text = container.textContent || "";
+        if (text.indexOf("Twitter / Twemoji") !== -1 && text.indexOf("Google Noto") !== -1) {
+          container.remove();
+          return;
+        }
+      }
+    });
   }
 
   function versionClassicAsset(value) {

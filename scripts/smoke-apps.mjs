@@ -255,6 +255,42 @@ async function main() {
     await evaluate(`document.querySelector(".shelf button.status").click()`);
   }
 
+  await waitFor(`${appButton("FileDrop")} != null`, "the FileDrop desktop app");
+  await evaluate(`${appButton("FileDrop")}.click()`);
+  await waitFor(
+    `Boolean(document.querySelector('.aos-filedrop-window:not([hidden])') && document.querySelector('.aos-filedrop-taskbar'))`,
+    "FileDrop to open in a window and appear on the taskbar"
+  );
+  await waitFor(
+    `Boolean(document.querySelector('.aos-filedrop-offline'))`,
+    "FileDrop's native-service guidance"
+  );
+  await evaluate(`document.querySelector('.aos-filedrop-window [data-fd-close]').click()`);
+  await waitFor(
+    `document.querySelector('.aos-filedrop-window').hidden && !document.querySelector('.aos-filedrop-taskbar')`,
+    "FileDrop to close and leave the taskbar"
+  );
+
+  await evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", {key:"s",code:"KeyS",ctrlKey:true,bubbles:true,cancelable:true}))`);
+  await waitFor(`Boolean(document.querySelector('.aos-screenshot-selector'))`, "Ctrl+S screenshot selection");
+  await evaluate(`(() => {
+    const selector = document.querySelector('.aos-screenshot-selector');
+    selector.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true,button:0,clientX:80,clientY:90,pointerId:31}));
+    selector.dispatchEvent(new PointerEvent('pointermove', {bubbles:true,buttons:1,clientX:420,clientY:310,pointerId:31}));
+    selector.dispatchEvent(new PointerEvent('pointerup', {bubbles:true,button:0,clientX:420,clientY:310,pointerId:31}));
+  })()`);
+  await waitFor(
+    `Boolean(document.querySelector('.aos-screenshot-window:not([hidden]) canvas') && document.querySelector('.aos-screenshot-window canvas').width > 100)`,
+    "the screenshot crop-and-paint window",
+    30000
+  );
+  await evaluate(`document.querySelector('.aos-screenshot-window [data-screenshot-save]').click()`);
+  await waitFor(
+    `JSON.parse(localStorage.getItem('aos-files') || '[]').some(file => /^Screenshot .*\\.png$/.test(file.name) && file.source === 'A-OS Screenshot Studio')`,
+    "the screenshot saved in A-OS Files"
+  );
+  await evaluate(`document.querySelector('.aos-screenshot-window [data-screenshot-close]').click()`);
+
   for (const label of requiredApps) {
     await waitFor(`${appButton(label)} != null`, `${label} on the taskbar`);
     await evaluate(`${appButton(label)}.click()`);
@@ -291,7 +327,7 @@ async function main() {
 
   await waitFor(
     `Boolean(window.AOS_FAMILY_DEVICE && typeof window.AOS_FAMILY_DEVICE.open === "function")`,
-    "the A-OS 3.0 Family Device runtime"
+    "the A-OS 3.5 Family Device runtime"
   );
   await evaluate("window.AOS_FAMILY_DEVICE.open()");
   await waitFor(

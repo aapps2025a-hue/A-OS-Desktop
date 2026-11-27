@@ -1,0 +1,252 @@
+.aos-filedrop-shortcut > span {
+  background: rgba(255, 255, 255, .9) !important;
+}
+
+.aos-filedrop-window {
+  --fd-ink: #172033;
+  --fd-muted: #667188;
+  --fd-line: rgba(109, 129, 164, .24);
+  --fd-surface: rgba(248, 251, 255, .86);
+  --fd-card: rgba(255, 255, 255, .78);
+  z-index: 5500 !important;
+  top: 50%;
+  left: 50%;
+  width: min(920px, calc(100vw - 56px));
+  height: min(650px, calc(100vh - 126px));
+  min-width: 600px;
+  min-height: 460px;
+  color: var(--fd-ink);
+  border: 1px solid rgba(255, 255, 255, .62) !important;
+  border-radius: 8px !important;
+  background: var(--fd-surface) !important;
+  box-shadow: 0 30px 90px rgba(20, 44, 82, .34) !important;
+  backdrop-filter: blur(28px) saturate(1.25) !important;
+  transform: translate(-50%, -50%);
+  overflow: hidden !important;
+}
+
+.aos-filedrop-window[hidden] { display: none !important; }
+.aos-filedrop-window.aos-filedrop-minimized { display: none !important; }
+.aos-filedrop-window.aos-filedrop-maximized {
+  inset: 12px 12px 82px !important;
+  width: auto !important;
+  height: auto !important;
+  transform: none !important;
+}
+
+.aos-filedrop-titlebar {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 0 13px 0 17px;
+  border-bottom: 1px solid var(--fd-line);
+  background: rgba(255, 255, 255, .36);
+  cursor: move;
+  user-select: none;
+}
+
+.aos-filedrop-titlebar > img { width: 34px; height: 34px; object-fit: contain; }
+.aos-filedrop-titlebar > span { display: grid; min-width: 0; flex: 1; }
+.aos-filedrop-titlebar strong { font: 700 14px/1.2 "TT Norms", Inter, system-ui, sans-serif; }
+.aos-filedrop-titlebar small { color: var(--fd-muted); font: 500 10px/1.3 "TT Norms", Inter, system-ui, sans-serif; }
+.aos-filedrop-controls { display: flex; align-items: center; gap: 5px; }
+.aos-filedrop-controls button {
+  width: 33px !important;
+  height: 33px !important;
+  min-width: 33px !important;
+  padding: 0 !important;
+  display: grid !important;
+  place-items: center;
+  border: 0 !important;
+  border-radius: 6px !important;
+  color: var(--fd-ink) !important;
+  background: rgba(255, 255, 255, .56) !important;
+  font: 800 15px/1 system-ui !important;
+  cursor: pointer;
+}
+.aos-filedrop-controls button:hover { background: rgba(224, 232, 246, .92) !important; }
+.aos-filedrop-controls [data-fd-close]:hover { color: white !important; background: #d84855 !important; }
+
+.aos-filedrop-body {
+  height: calc(100% - 58px);
+  display: grid;
+  grid-template-columns: minmax(190px, 238px) minmax(0, 1fr);
+  font-family: "TT Norms", Inter, system-ui, sans-serif;
+}
+
+.aos-filedrop-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  padding: 18px;
+  border-right: 1px solid var(--fd-line);
+  background: rgba(230, 239, 251, .5);
+  overflow: auto;
+}
+.aos-filedrop-device-mark {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #20c7b8, #3b62e8);
+  box-shadow: 0 12px 25px rgba(46, 98, 207, .22);
+}
+.aos-filedrop-device-mark img { width: 35px; height: 35px; filter: brightness(0) invert(1); }
+.aos-filedrop-sidebar h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+.aos-filedrop-sidebar p { margin: -8px 0 2px; color: var(--fd-muted); font-size: 11px; line-height: 1.45; }
+.aos-filedrop-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--fd-line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .62);
+}
+.aos-filedrop-toggle > span { min-width: 0; flex: 1; display: grid; }
+.aos-filedrop-toggle b { font-size: 12px; }
+.aos-filedrop-toggle small { color: var(--fd-muted); font-size: 9px; }
+.aos-filedrop-switch { position: relative; width: 40px; height: 23px; flex: none; }
+.aos-filedrop-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.aos-filedrop-switch i { position: absolute; inset: 0; border-radius: 20px; background: #9ba7bb; transition: .18s ease; }
+.aos-filedrop-switch i:after { content: ""; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: white; box-shadow: 0 2px 6px #0003; transition: .18s ease; }
+.aos-filedrop-switch input:checked + i { background: #2468e7; }
+.aos-filedrop-switch input:checked + i:after { transform: translateX(17px); }
+.aos-filedrop-name { display: grid; gap: 5px; }
+.aos-filedrop-name label { color: var(--fd-muted); font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.aos-filedrop-name div { display: flex; gap: 5px; }
+.aos-filedrop-name input {
+  min-width: 0;
+  width: 100%;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--fd-line);
+  border-radius: 6px;
+  color: var(--fd-ink);
+  background: rgba(255, 255, 255, .72);
+  font: 600 11px "TT Norms", Inter, system-ui, sans-serif;
+}
+.aos-filedrop-name button,
+.aos-filedrop-primary,
+.aos-filedrop-quiet,
+.aos-filedrop-action {
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font: 700 11px "TT Norms", Inter, system-ui, sans-serif;
+}
+.aos-filedrop-name button { width: 35px; flex: none; color: white; background: #315efb; }
+.aos-filedrop-path { margin-top: auto !important; word-break: break-word; }
+
+.aos-filedrop-main { min-width: 0; padding: 18px; overflow: auto; }
+.aos-filedrop-offline {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+.aos-filedrop-offline > div { max-width: 430px; }
+.aos-filedrop-offline img { width: 76px; height: 76px; }
+.aos-filedrop-offline h2 { margin: 12px 0 6px; font-size: 20px; letter-spacing: 0; }
+.aos-filedrop-offline p { margin: 0; color: var(--fd-muted); font-size: 12px; line-height: 1.55; }
+
+.aos-filedrop-section { margin-bottom: 20px; }
+.aos-filedrop-section > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+.aos-filedrop-section h3 { margin: 0; font-size: 14px; letter-spacing: 0; }
+.aos-filedrop-section header small { color: var(--fd-muted); font-size: 10px; }
+.aos-filedrop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 8px; }
+.aos-filedrop-peer,
+.aos-filedrop-file {
+  min-height: 67px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--fd-line);
+  border-radius: 7px;
+  color: var(--fd-ink);
+  background: var(--fd-card);
+  text-align: left;
+  cursor: pointer;
+}
+.aos-filedrop-peer:hover,
+.aos-filedrop-file:hover { border-color: rgba(49, 94, 251, .5); background: rgba(255, 255, 255, .94); }
+.aos-filedrop-peer[aria-pressed="true"],
+.aos-filedrop-file[aria-pressed="true"] { border-color: #315efb; box-shadow: inset 0 0 0 1px #315efb; background: rgba(226, 235, 255, .95); }
+.aos-filedrop-peer img,
+.aos-filedrop-file img { width: 35px; height: 35px; object-fit: contain; flex: none; }
+.aos-filedrop-peer span,
+.aos-filedrop-file span { display: grid; min-width: 0; }
+.aos-filedrop-peer b,
+.aos-filedrop-file b { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.aos-filedrop-peer small,
+.aos-filedrop-file small { color: var(--fd-muted); font-size: 9px; }
+.aos-filedrop-empty { padding: 15px; border: 1px dashed var(--fd-line); border-radius: 7px; color: var(--fd-muted); font-size: 11px; text-align: center; }
+.aos-filedrop-sendbar { position: sticky; bottom: -18px; display: flex; align-items: center; gap: 10px; margin: 0 -18px -18px; padding: 12px 18px; border-top: 1px solid var(--fd-line); background: rgba(248, 251, 255, .92); backdrop-filter: blur(14px); }
+.aos-filedrop-sendbar span { min-width: 0; flex: 1; color: var(--fd-muted); font-size: 10px; }
+.aos-filedrop-primary { min-height: 37px; padding: 0 15px; color: white; background: #315efb; }
+.aos-filedrop-primary:hover { background: #234bcf; }
+.aos-filedrop-primary:disabled { cursor: not-allowed; opacity: .45; }
+.aos-filedrop-quiet { min-height: 31px; padding: 0 10px; color: var(--fd-ink); background: #e7edf7; }
+.aos-filedrop-quiet:hover { background: #d8e2f1; }
+
+.aos-filedrop-incoming { display: grid; gap: 7px; margin-bottom: 18px; }
+.aos-filedrop-offer,
+.aos-filedrop-transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 11px;
+  border: 1px solid var(--fd-line);
+  border-radius: 7px;
+  background: var(--fd-card);
+}
+.aos-filedrop-offer span,
+.aos-filedrop-transfer span { display: grid; min-width: 0; }
+.aos-filedrop-offer b,
+.aos-filedrop-transfer b { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.aos-filedrop-offer small,
+.aos-filedrop-transfer small { color: var(--fd-muted); font-size: 9px; }
+.aos-filedrop-actions { display: flex; gap: 5px; }
+.aos-filedrop-action { min-height: 31px; padding: 0 10px; color: white; background: #315efb; }
+.aos-filedrop-action[data-reject] { color: var(--fd-ink); background: #e8edf6; }
+.aos-filedrop-progress { grid-column: 1 / -1; height: 4px; overflow: hidden; border-radius: 4px; background: #dce3ef; }
+.aos-filedrop-progress i { display: block; width: var(--progress, 0%); height: 100%; background: linear-gradient(90deg, #21c5b6, #315efb); }
+.aos-filedrop-status { min-height: 16px; color: var(--fd-muted); font-size: 10px; }
+.aos-filedrop-status[data-error="true"] { color: #bb3441; }
+.aos-filedrop-resize { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; }
+
+.dark-mode .aos-filedrop-window {
+  --fd-ink: #f4f7fb;
+  --fd-muted: #aab6ca;
+  --fd-line: rgba(185, 201, 228, .18);
+  --fd-surface: rgba(15, 28, 48, .88);
+  --fd-card: rgba(30, 48, 73, .72);
+  border-color: rgba(185, 213, 255, .16) !important;
+}
+.dark-mode .aos-filedrop-titlebar { background: rgba(19, 37, 62, .58); }
+.dark-mode .aos-filedrop-controls button,
+.dark-mode .aos-filedrop-toggle,
+.dark-mode .aos-filedrop-name input { color: var(--fd-ink) !important; background: rgba(40, 61, 89, .72) !important; }
+.dark-mode .aos-filedrop-sidebar { background: rgba(9, 23, 42, .48); }
+.dark-mode .aos-filedrop-peer:hover,
+.dark-mode .aos-filedrop-file:hover { background: rgba(42, 64, 94, .9); }
+.dark-mode .aos-filedrop-peer[aria-pressed="true"],
+.dark-mode .aos-filedrop-file[aria-pressed="true"] { background: rgba(40, 74, 135, .78); }
+.dark-mode .aos-filedrop-sendbar { background: rgba(15, 28, 48, .92); }
+.dark-mode .aos-filedrop-quiet { color: #f4f7fb; background: #304766; }
+
+@media (max-width: 720px) {
+  .aos-filedrop-window { inset: 8px 8px 76px !important; width: auto !important; height: auto !important; min-width: 0; min-height: 0; transform: none !important; }
+  .aos-filedrop-body { grid-template-columns: 1fr; }
+  .aos-filedrop-sidebar { max-height: 166px; display: grid; grid-template-columns: auto 1fr; align-items: center; border-right: 0; border-bottom: 1px solid var(--fd-line); }
+  .aos-filedrop-sidebar h2, .aos-filedrop-sidebar > p, .aos-filedrop-path { display: none; }
+  .aos-filedrop-device-mark { grid-row: 1 / 3; }
+  .aos-filedrop-toggle, .aos-filedrop-name { min-width: 0; }
+  .aos-filedrop-main { padding: 13px; }
+  .aos-filedrop-grid { grid-template-columns: 1fr 1fr; }
+  .aos-filedrop-sendbar { bottom: -13px; margin: 0 -13px -13px; padding: 10px 13px; }
+}

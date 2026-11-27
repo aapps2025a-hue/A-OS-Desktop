@@ -222,7 +222,7 @@
 
   function decodeFamilyCode(code) {
     var text = String(code || "").trim();
-    if (!/^AF3\./.test(text)) throw new Error("That is not an A-OS 3.0 Family code.");
+    if (!/^AF3\./.test(text)) throw new Error("That is not an A-OS 3 Family code.");
     var raw = text.slice(4).replace(/-/g, "+").replace(/_/g, "/");
     while (raw.length % 4) raw += "=";
     var binary = atob(raw);
@@ -244,7 +244,7 @@
   }
 
   function familyPanel(value) {
-    return '<header><img src="./assets/icons/Company.png" alt=""><span><b>Family Device</b><small>A-OS 3.0 family accounts</small></span><button type="button" data-family-close aria-label="Close">&times;</button></header>' +
+    return '<header><img src="./assets/icons/Company.png" alt=""><span><b>Family Device</b><small>A-OS 3.5 family accounts</small></span><button type="button" data-family-close aria-label="Close">&times;</button></header>' +
       '<main><section class="aos-family-heading"><div><h1>' + escapeHtml(value.name) + '</h1><p>Manage the people who can use this A-OS device.</p></div><button type="button" data-family-lock>Lock admin controls</button></section>' +
       '<section class="aos-family-members"><h2>People</h2>' + memberRows(value) + '</section>' +
       '<form data-family-add><h2>Make Family account</h2><div class="aos-family-fields"><label>Name<input name="name" required maxlength="40"></label><label>Password<input name="password" type="password" required minlength="4"></label><label>Layout<select name="age"><option value="8+">Age 8 or older</option><option value="7-">Age 7 or younger</option></select></label></div><button type="submit">Create person</button><p data-family-status aria-live="polite"></p></form>' +
@@ -477,7 +477,7 @@
     if (value === "/info") {
       var info;
       try { info = await nativeRequest("/__aos/info"); }
-      catch (_) { info = {ip: "Browser managed", device: navigator.platform || "A-OS Device", processor: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " logical processors" : "Unavailable", os: "A-OS Desktop 3.0"}; }
+      catch (_) { info = {ip: "Browser managed", device: navigator.platform || "A-OS Device", processor: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " logical processors" : "Unavailable", os: "A-OS Desktop 3.5"}; }
       appendTerminal(terminal, ["IP: " + info.ip, "Device: " + info.device, "Processor: " + info.processor, "OS: " + info.os]);
       return true;
     }
@@ -521,7 +521,7 @@
       appendTerminal(terminal, [launched.message || "Linux application opened."]);
       return true;
     }
-    if (value === "/help") { appendTerminal(terminal, ["A-OS Terminal 2.4 commands:", "/info  /kill  /py install  /restart  /shutdown  /ai  /family", "/linux apps  /linux open <app id>", "/delete partitions a-os", "/run-<filename>indesktop  C://<file location>"]); return true; }
+    if (value === "/help") { appendTerminal(terminal, ["A-OS Terminal 3.5 commands:", "/info  /kill  /py install  /restart  /shutdown  /ai  /family", "/linux apps  /linux open <app id>", "/delete partitions a-os", "/run-<filename>indesktop  C://<file location>", "Installed A-OS also accepts Debian commands such as ls, cd, cp, mv, grep, find, python3 and apt-cache."]); return true; }
     var desktopMatch = value.match(/^\/run-(.+)indesktop$/i);
     if (desktopMatch) {
       var desktopFile = files().find(function (file) { return String(file.name || "").toLowerCase() === desktopMatch[1].toLowerCase(); });
@@ -534,6 +534,22 @@
       await runFile(located, terminal);
       return true;
     }
+    if (window.AOS_NATIVE_BRIDGE) {
+      if (value === "clear") {
+        var main = terminal.querySelector("main");
+        if (main) main.replaceChildren();
+        return true;
+      }
+      var cwd = localStorage.getItem("aos-terminal-cwd") || "/home/aos";
+      var shell = await nativeRequest("/__aos/terminal", {command: value, cwd: cwd});
+      if (shell.cwd) localStorage.setItem("aos-terminal-cwd", shell.cwd);
+      var lines = [];
+      if (shell.output) lines = lines.concat(String(shell.output).split("\n"));
+      if (shell.error) lines = lines.concat(String(shell.error).split("\n"));
+      if (!lines.length) lines.push(shell.exitCode === 0 ? "Command completed." : "Command exited with code " + shell.exitCode + ".");
+      appendTerminal(terminal, lines);
+      return true;
+    }
     return false;
   }
 
@@ -542,7 +558,8 @@
     if (!form) return;
     var input = form.querySelector("input");
     var command = input && input.value.trim();
-    if (!command || !(/^\/(info|kill|py install|restart|shutdown|ai|family|help|delete partitions a-os|linux apps|linux open\s+)/i.test(command) || /^\/run-.+indesktop$/i.test(command) || /^C:\/\//i.test(command))) return;
+    var aosCommand = /^\/(info|kill|py install|restart|shutdown|ai|family|help|delete partitions a-os|linux apps|linux open\s+)/i.test(command || "") || /^\/run-.+indesktop$/i.test(command || "") || /^C:\/\//i.test(command || "");
+    if (!command || (!window.AOS_NATIVE_BRIDGE && !aosCommand)) return;
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
