@@ -275,6 +275,20 @@ async function main() {
       shelf.dispatchEvent(new DragEvent('drop', {bubbles:true,cancelable:true,dataTransfer:controlTransfer}));
       search.dispatchEvent(new DragEvent('dragend', {bubbles:true,dataTransfer:controlTransfer}));
       const controlAfter = [...shelf.querySelectorAll('[data-aos-taskbar-drag="ready"]')].indexOf(search);
+      const pointerSource = shelf.querySelector(':scope > .status');
+      const pointerTarget = shelf.querySelector(':scope > .launcher-button');
+      const pointerItems = () => [...shelf.querySelectorAll('[data-aos-taskbar-drag="ready"]')];
+      const pointerBefore = pointerItems().indexOf(pointerSource);
+      const pointerStart = pointerSource.getBoundingClientRect();
+      const pointerDestination = pointerTarget.getBoundingClientRect();
+      pointerSource.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true,cancelable:true,button:0,buttons:1,pointerId:71,pointerType:'mouse',isPrimary:true,clientX:pointerStart.left+pointerStart.width/2,clientY:pointerStart.top+pointerStart.height/2}));
+      window.dispatchEvent(new PointerEvent('pointermove', {bubbles:true,cancelable:true,button:-1,buttons:1,pointerId:71,pointerType:'mouse',isPrimary:true,clientX:pointerDestination.left+1,clientY:pointerDestination.top+pointerDestination.height/2}));
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const pointerDuring = pointerItems().indexOf(pointerSource);
+      window.dispatchEvent(new PointerEvent('pointerup', {bubbles:true,cancelable:true,button:0,buttons:0,pointerId:71,pointerType:'mouse',isPrimary:true,clientX:pointerDestination.left+1,clientY:pointerDestination.top+pointerDestination.height/2}));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const pointerAfter = pointerItems().indexOf(pointerSource);
+      const pointerReorder = pointerBefore !== pointerAfter && pointerDuring === pointerAfter && JSON.parse(localStorage.getItem('aos-taskbar-order') || '[]').indexOf('control:status') === pointerAfter;
       const settings = ${appButton("Settings")};
       const icon = settings.querySelector('img') ? settings.querySelector('img').src : '';
       api.createDesktopShortcut('Settings', icon, 500, 180);
@@ -353,6 +367,20 @@ async function main() {
       const quickPanel = document.querySelector('.quick');
       const quickAbove = isAbove(quickPanel, status) && quickPanel.dataset.aosTaskbarAnchor === 'control:status';
       const quickDetail = overlaySnapshot(quickPanel, status, quickAbove);
+      const quickTiles = [...quickPanel.querySelectorAll('.quick-tiles > button')];
+      const quickSource = quickTiles[quickTiles.length - 1];
+      const quickTarget = quickTiles[0];
+      const quickBefore = [...quickPanel.querySelectorAll('.quick-tiles > button')].indexOf(quickSource);
+      const quickStart = quickSource.getBoundingClientRect();
+      const quickDestination = quickTarget.getBoundingClientRect();
+      quickSource.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true,cancelable:true,button:0,buttons:1,pointerId:72,pointerType:'mouse',isPrimary:true,clientX:quickStart.left+quickStart.width/2,clientY:quickStart.top+quickStart.height/2}));
+      window.dispatchEvent(new PointerEvent('pointermove', {bubbles:true,cancelable:true,button:-1,buttons:1,pointerId:72,pointerType:'mouse',isPrimary:true,clientX:quickDestination.left+1,clientY:quickDestination.top+quickDestination.height/2}));
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const quickDuring = [...quickPanel.querySelectorAll('.quick-tiles > button')].indexOf(quickSource);
+      window.dispatchEvent(new PointerEvent('pointerup', {bubbles:true,cancelable:true,button:0,buttons:0,pointerId:72,pointerType:'mouse',isPrimary:true,clientX:quickDestination.left+1,clientY:quickDestination.top+quickDestination.height/2}));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const quickAfter = [...quickPanel.querySelectorAll('.quick-tiles > button')].indexOf(quickSource);
+      const quickPointerReorder = quickBefore !== quickAfter && quickDuring === quickAfter;
       status.click();
 
       const ai = shelf.querySelector('[aria-label="AI shortcut"]');
@@ -370,6 +398,8 @@ async function main() {
         reorder: before.join('|') !== after.join('|'),
         draggable: apps.every((button) => button.draggable),
         controlReorder: controlBefore !== controlAfter,
+        pointerReorder,
+        quickPointerReorder,
         controlsDraggable: [search, status, launcher].every((item) => item && item.draggable),
         pointerSort: search && search.dataset.aosPointerSort === 'ready',
         customPointer: Boolean(window.AOS_POINTERS && customPointerControl && customPointerControl.querySelector('input[type="file"][data-aos-allowed-picker="true"]:not(:disabled)')),
@@ -401,7 +431,7 @@ async function main() {
         }
       };
     })()`);
-    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "pointerSort", "customPointer", "shortcut", "file", "pins", "widgets", "status", "handle", "overlays", "statusMenus", "statusMenuActions", "sounds"];
+    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "pointerReorder", "quickPointerReorder", "controlsDraggable", "pointerSort", "customPointer", "shortcut", "file", "pins", "widgets", "status", "handle", "overlays", "statusMenus", "statusMenuActions", "sounds"];
     if (taskbarChecks.some((key) => taskbarResult[key] !== true)) {
       throw new Error(`Taskbar studio regression: ${JSON.stringify(taskbarResult)}`);
     }

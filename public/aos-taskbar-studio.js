@@ -118,6 +118,16 @@
     writeJson(ORDER_KEY, shelfReorderItems(shelf).map(shelfItemKey));
   }
 
+  function taskbarOrderIsChanging(shelf) {
+    if (pointerSort && pointerSort.active && pointerSort.shelf === shelf) return true;
+    return Boolean(
+      draggingApp &&
+      draggingApp.source &&
+      draggingApp.source.parentElement === shelf &&
+      draggingApp.source.classList.contains("aos-taskbar-dragging")
+    );
+  }
+
   function clearInsertionGap(container) {
     if (!container) return;
     container.querySelectorAll(".aos-insert-before, .aos-insert-after").forEach(function (item) {
@@ -584,7 +594,8 @@
   }
 
   function installQuickTileSorting(grid) {
-    applyQuickTileOrder(grid);
+    var pointerChangingOrder = quickPointerSort && quickPointerSort.active && quickPointerSort.grid === grid;
+    if (!pointerChangingOrder && !grid.dataset.aosDraggingQuickTile) applyQuickTileOrder(grid);
     quickTileButtons(grid).forEach(function (button) { bindQuickTile(button, grid); });
     if (grid.dataset.aosQuickDrop === "ready") return;
     grid.dataset.aosQuickDrop = "ready";
@@ -1054,7 +1065,7 @@
       desktop.classList.add(LAYOUT_CLASS_PREFIX + layout);
       var shelf = desktop.querySelector(":scope > .shelf");
       if (shelf) {
-        applyTaskbarOrder(shelf);
+        if (!taskbarOrderIsChanging(shelf)) applyTaskbarOrder(shelf);
         installShelfDragAndDrop(shelf);
         installResizeHandle(desktop, shelf);
         updateStatus(shelf.querySelector(":scope > .status"));
