@@ -4,6 +4,7 @@
   if (window.AOS_FILEDROP) return;
 
   var SERVICE = "http://127.0.0.1:45872";
+  var BROWSER_STATE_KEY = "aos-filedrop-browser-state";
   var ICON = "./assets/icons/FileDrop.svg";
   var state = null;
   var windowElement = null;
@@ -17,6 +18,39 @@
   var pollTimer = 0;
   var notifiedOffers = new Set();
   var notifiedComplete = new Set();
+
+  function readBrowserSettings() {
+    var fallbackName = "A-OS Computer";
+    try {
+      var saved = JSON.parse(localStorage.getItem(BROWSER_STATE_KEY) || "{}");
+      return {
+        enabled: Boolean(saved.enabled),
+        name: String(saved.name || fallbackName).slice(0, 80)
+      };
+    } catch (_) {
+      return {enabled: false, name: fallbackName};
+    }
+  }
+
+  function saveBrowserSettings(changes) {
+    var saved = Object.assign(readBrowserSettings(), changes || {});
+    saved.enabled = Boolean(saved.enabled);
+    saved.name = String(saved.name || "A-OS Computer").trim().slice(0, 80) || "A-OS Computer";
+    try { localStorage.setItem(BROWSER_STATE_KEY, JSON.stringify(saved)); } catch (_) {}
+    return saved;
+  }
+
+  function browserState() {
+    var saved = readBrowserSettings();
+    return {
+      enabled: saved.enabled,
+      device: {name: saved.name, platform: "A-OS Browser"},
+      downloads: "A-OS Files > Downloads",
+      peers: [],
+      transfers: [],
+      browserMode: true
+    };
+  }
 
   function parseFiles() {
     try {
@@ -115,10 +149,16 @@
 
   async function request(path, options) {
     var response;
+    var controller = new AbortController();
+    var timeout = window.setTimeout(function () { controller.abort(); }, 1400);
     try {
-      response = await fetch(SERVICE + path, Object.assign({cache: "no-store", mode: "cors"}, options || {}));
+      response = await fetch(SERVICE + path, Object.assign({cache: "no-store", mode: "cors", signal: controller.signal}, options || {}));
     } catch (_) {
-      throw new Error("FileDrop is not running on this device. Open the A-OS FileDrop desktop app, then try again.");
+      var unavailable = new Error("The native FileDrop service is not running on this device.");
+      unavailable.code = "FILEDROP_SERVICE_UNAVAILABLE";
+      throw unavailable;
+    } finally {
+      clearTimeout(timeout);
     }
     var body = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(body.error || "FileDrop could not complete that action.");
@@ -146,12 +186,6 @@
     return "./assets/icons/Files.png";
   }
 
-  function renderOffline() {
-    if (!mainElement) return;
-    mainElement.innerHTML = '<section class="aos-filedrop-offline"><div><img src="' + ICON + '" alt=""><h2>Start FileDrop on this device</h2><p>The native FileDrop service is not running. On an installed A-OS computer it starts automatically. On Windows or macOS, open the A-OS FileDrop desktop app.</p></div></section>';
-    if (enabledInput) enabledInput.disabled = true;
-  }
-
   function transferStatus(transfer) {
     var value = String(transfer.state || "").replace(/_/g, " ");
     value = value.charAt(0).toUpperCase() + value.slice(1);
@@ -175,6 +209,9 @@
     var transfers = (state.transfers || []).filter(function (item) { return item.state !== "pending"; }).slice(0, 8);
 
     var html = "";
+    if (state.browserMode) {
+      html += '<section class="aos-filedrop-offline aos-filedrop-browser-mode"><div><img src="' + ICON + '" alt=""><h2>FileDrop browser mode</h2><p>The switch works here and A-OS remembers it. Start the FileDrop desktop service to discover and send to computers on your local network.</p></div></section>';
+    }
     if (pending.length) {
       html += '<section class="aos-filedrop-section"><header><h3>Waiting for you</h3><small>Accept only files you expect</small></header><div class="aos-filedrop-incoming">';
       pending.forEach(function (item) {
@@ -182,8 +219,8 @@
       });
       html += "</div></section>";
     }
-    html += '<section class="aos-filedrop-section"><header><h3>Nearby devices</h3><small>' + (state.enabled ? "Same local network" : "FileDrop is off") + '</small></header><div class="aos-filedrop-grid">';
-    if (!peers.length) html += '<div class="aos-filedrop-empty">' + (state.enabled ? "Looking for A-OS, Windows, and Mac devices…" : "Enable FileDrop to find devices.") + '</div>';
+    html += '<section class="aos-filedrop-section"><header><h3>Nearby devices</h3><small>' + (state.browserMode ? "Browser mode" : state.enabled ? "Same local network" : "FileDrop is off") + '</small></header><div class="aos-filedrop-grid">';
+    if (!peers.length) html += '<div class="aos-filedrop-empty">' + (state.enabled ? state.browserMode ? "FileDrop is on. Start the desktop service to find nearby devices." : "Looking for A-OS, Windows, and Mac devices…" : "Enable FileDrop to find devices.") + '</div>';
     peers.forEach(function (peer) {
       html += '<button class="aos-filedrop-peer" aria-pressed="' + (peer.id === selectedPeer) + '" data-peer="' + escapeHtml(peer.id) + '"><img src="' + platformIcon(peer) + '" alt=""><span><b>' + escapeHtml(peer.name) + '</b><small>' + escapeHtml(peer.platform) + '</small></span></button>';
     });
@@ -212,6 +249,11 @@
     if (!windowElement || windowElement.hidden) return;
     try {
       state = await request("/api/state");
+      var saved = readBrowserSettings();
+      if (saved.enabled && !state.enabled) {
+        state = await request("/api/enable", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({enabled: true})});
+      }
+      saveBrowserSettings({enabled: state.enabled, name: state.device && state.device.name});
       (state.transfers || []).forEach(function (item) {
         if (item.direction === "incoming" && item.state === "pending" && !notifiedOffers.has(item.id)) {
           notifiedOffers.add(item.id);
@@ -225,16 +267,20 @@
       render();
       setStatus(state.enabled ? "Ready on your local network" : "FileDrop is off", false);
     } catch (error) {
-      state = null;
-      renderOffline();
-      setStatus(error.message || "FileDrop is unavailable", true);
+      if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") {
+        state = browserState();
+        render();
+        setStatus(state.enabled ? "FileDrop is on in browser mode" : "FileDrop is off", false);
+      } else {
+        setStatus(error.message || "FileDrop is unavailable", true);
+      }
     }
   }
 
   function startPolling() {
     clearInterval(pollTimer);
     refresh();
-    pollTimer = window.setInterval(refresh, 900);
+    pollTimer = window.setInterval(refresh, 3000);
   }
 
   async function sendSelected() {
@@ -382,12 +428,31 @@
     windowElement.querySelector("[data-fd-minimize]").addEventListener("click", function () { windowElement.classList.add("aos-filedrop-minimized"); });
     windowElement.querySelector("[data-fd-maximize]").addEventListener("click", function () { windowElement.classList.toggle("aos-filedrop-maximized"); });
     enabledInput.addEventListener("change", async function () {
-      try { state = await request("/api/enable", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({enabled: enabledInput.checked})}); render(); }
-      catch (error) { enabledInput.checked = !enabledInput.checked; setStatus(error.message, true); }
+      var enabled = enabledInput.checked;
+      saveBrowserSettings({enabled: enabled});
+      try {
+        state = await request("/api/enable", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({enabled: enabled})});
+        render();
+        setStatus(enabled ? "Ready on your local network" : "FileDrop is off", false);
+      } catch (error) {
+        if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") {
+          state = browserState();
+          render();
+          setStatus(enabled ? "FileDrop is on in browser mode" : "FileDrop is off", false);
+        } else {
+          enabledInput.checked = !enabled;
+          saveBrowserSettings({enabled: !enabled});
+          setStatus(error.message, true);
+        }
+      }
     });
     windowElement.querySelector("[data-fd-save-name]").addEventListener("click", async function () {
+      saveBrowserSettings({name: nameInput.value});
       try { state = await request("/api/name", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name: nameInput.value})}); render(); setStatus("Device name saved", false); }
-      catch (error) { setStatus(error.message, true); }
+      catch (error) {
+        if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") { state = browserState(); render(); setStatus("Device name saved for browser mode", false); }
+        else setStatus(error.message, true);
+      }
     });
   }
 

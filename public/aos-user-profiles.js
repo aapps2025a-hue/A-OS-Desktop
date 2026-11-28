@@ -3,6 +3,8 @@
   var keys = [];
   var extras = ["aos-show-taskbar-quick-button", "aos-profile-avatar-type", "aos-profile-avatar-letter", "aos-profile-avatar-color", "aos-hibernate-snapshot", "aos-hibernate-restore-pending", "aos-family-active-member", "aos-aapplications-session", "aos-aapplications-sync-options", "aos-aapplications-last-sync", "aos-boot-gif-choice"];
   extras = extras.concat(["aos-accent-color", "aos-bg-animation", "aos-cloud-clipboard", "aos-files-quick-pins", "aos-files-sidepins", "aos-file-handlers", "aos-glassmorphism-mode", "aos-pointer-text-enabled", "aos-pointer-text", "aos-window-blur", "aos-window-transparency", "aos-browser-pending-tab", "aos-startup-sound-id", "aos-auto-apply-cloud", "aos-auto-backup", "aos-active-emoji-pack"]);
+  extras = extras.concat(["aos-taskbar-layout", "aos-taskbar-size", "aos-taskbar-order", "aos-taskbar-desktop-shortcuts", "aos-taskbar-browser-pins", "aos-widget-safe-positions"]);
+  extras = extras.concat(["aos-notification-sounds", "aos-notification-volume", "aos-notification-tone", "aos-ringtone-tone"]);
   function workspaceKey(name) { return "aos-profile-workspace-" + encodeURIComponent(name || "Person"); }
   function passwordKey(name) { return "aos-profile-password-" + encodeURIComponent(name || "Person"); }
   function personalKeys() {

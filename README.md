@@ -11,8 +11,10 @@ desktop.
 
 ## New Stuff
 
-A-OS 3.5 adds screenshot cropping and painting, FileDrop downloads, a native
-Debian terminal, Linux-backed files, and a consistent classic window style.
+A-OS 4.0 adds fully reorderable and resizable taskbar controls, collision-safe
+widgets, original A-OS notification and call sounds, and richer desktop motion.
+It keeps the screenshot studio, FileDrop, native Debian terminal, and
+Linux-backed files from A-OS 3.5.
 ## Run locally
 
 Serve the `public` folder with any static web server. For example:
@@ -71,6 +73,7 @@ Runtime assets live in these folders:
 - `public/assets/emojis/aos-3d` (the active A-OS Originals emoji pack)
 - `public/assets/backgrounds`
 - `public/assets/media`
+- `public/assets/sounds`
 - `public/assets/cursors`
 - `public/assets/os`
 

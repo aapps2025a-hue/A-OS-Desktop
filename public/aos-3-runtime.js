@@ -244,7 +244,7 @@
   }
 
   function familyPanel(value) {
-    return '<header><img src="./assets/icons/Company.png" alt=""><span><b>Family Device</b><small>A-OS 3.5 family accounts</small></span><button type="button" data-family-close aria-label="Close">&times;</button></header>' +
+    return '<header><img src="./assets/icons/Company.png" alt=""><span><b>Family Device</b><small>A-OS 4.0 family accounts</small></span><button type="button" data-family-close aria-label="Close">&times;</button></header>' +
       '<main><section class="aos-family-heading"><div><h1>' + escapeHtml(value.name) + '</h1><p>Manage the people who can use this A-OS device.</p></div><button type="button" data-family-lock>Lock admin controls</button></section>' +
       '<section class="aos-family-members"><h2>People</h2>' + memberRows(value) + '</section>' +
       '<form data-family-add><h2>Make Family account</h2><div class="aos-family-fields"><label>Name<input name="name" required maxlength="40"></label><label>Password<input name="password" type="password" required minlength="4"></label><label>Layout<select name="age"><option value="8+">Age 8 or older</option><option value="7-">Age 7 or younger</option></select></label></div><button type="submit">Create person</button><p data-family-status aria-live="polite"></p></form>' +
@@ -477,7 +477,7 @@
     if (value === "/info") {
       var info;
       try { info = await nativeRequest("/__aos/info"); }
-      catch (_) { info = {ip: "Browser managed", device: navigator.platform || "A-OS Device", processor: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " logical processors" : "Unavailable", os: "A-OS Desktop 3.5"}; }
+      catch (_) { info = {ip: "Browser managed", device: navigator.platform || "A-OS Device", processor: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " logical processors" : "Unavailable", os: "A-OS Desktop 4.0"}; }
       appendTerminal(terminal, ["IP: " + info.ip, "Device: " + info.device, "Processor: " + info.processor, "OS: " + info.os]);
       return true;
     }

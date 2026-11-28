@@ -50,7 +50,7 @@
 
   function renderSteps(sidebar) {
     sidebar.innerHTML = "";
-    sidebar.appendChild(element("h2", "", "Install A-OS 3.5"));
+    sidebar.appendChild(element("h2", "", "Install A-OS 4.0"));
     ["Where to install", "Connect this device", "Install and start"].forEach(function (label, index) {
       var item = element("div", "aos-installer__step" + (index === step ? " is-current" : "") + (index < step ? " is-complete" : ""));
       item.append(element("span", "", index < step ? "\u2713" : String(index + 1)), element("b", "", label));

@@ -2,7 +2,7 @@ import {readFileSync, writeFileSync} from "node:fs";
 import {execFileSync} from "node:child_process";
 
 const path = new URL("../public/version.json", import.meta.url);
-let current = {version: "3.5.0"};
+let current = {version: "4.0.0"};
 
 try {
   current = {...current, ...JSON.parse(readFileSync(path, "utf8"))};
@@ -20,8 +20,8 @@ if (!revision) {
 }
 
 const stamp = {
-  version: String(current.version || "3.5.0"),
-  build: new Date().toISOString(),
+  version: String(current.version || "4.0.0"),
+  build: process.env.AOS_BUILD_TIME || new Date().toISOString(),
   revision
 };
 

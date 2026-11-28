@@ -1,1 +1,35 @@
-You do this to use firebase
+{
+  "firestore": {
+    "rules": "firestore.nearby.rules"
+  },
+  "hosting": {
+    "predeploy": [
+      "node scripts/stamp-version.mjs"
+    ],
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "**/*.apk"
+    ],
+    "headers": [
+      {
+        "source": "/version.json",
+        "headers": [
+          {"key": "Cache-Control", "value": "no-store, max-age=0"},
+          {"key": "Access-Control-Allow-Origin", "value": "*"}
+        ]
+      },
+      {
+        "source": "/assets/sounds/**",
+        "headers": [
+          {"key": "Cache-Control", "value": "public, max-age=31536000, immutable"}
+        ]
+      }
+    ],
+    "rewrites": [
+      {"source": "**", "destination": "/a-os.html"}
+    ]
+  }
+}

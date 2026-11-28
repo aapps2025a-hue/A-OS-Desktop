@@ -528,7 +528,12 @@ class FileDropService:
                     parsed = urlparse(origin)
                 except ValueError:
                     return False
-                return parsed.hostname in {"127.0.0.1", "localhost", "a-os-desktop.web.app"}
+                return parsed.hostname in {
+                    "127.0.0.1",
+                    "localhost",
+                    "a-os-desktop.web.app",
+                    "aapps2025a-hue.github.io",
+                }
 
             def _cors(self) -> None:
                 origin = self.headers.get("Origin", "")

@@ -241,6 +241,104 @@ async function main() {
     return;
   }
 
+  if (process.env.AOS_TASKBAR_SMOKE === "1") {
+    await waitFor(`Boolean(window.AOS_TASKBAR_STUDIO && document.querySelector('.shelf .aos-taskbar-resize-handle'))`, "the taskbar studio runtime");
+    await evaluate(`${appButton("Settings")}.click()`);
+    await waitFor(`[...document.querySelectorAll("button")].some((button) => button.textContent.trim() === "Appearance")`, "Appearance settings");
+    await evaluate(`[...document.querySelectorAll("button")].find((button) => button.textContent.trim() === "Appearance").click()`);
+    await waitFor(`document.querySelectorAll('[data-aos-taskbar-layout]').length === 5`, "the five taskbar layouts");
+    const taskbarResult = await evaluate(`(async () => {
+      const api = window.AOS_TASKBAR_STUDIO;
+      api.setLayout('floating-segmented');
+      api.setSize(76);
+      const shelf = document.querySelector('.desktop > .shelf');
+      const apps = [...shelf.querySelectorAll('.shelf-icon, .astore-shelf-button, .aos-filedrop-taskbar')];
+      const first = apps[apps.length - 1];
+      const second = apps.find((button) => button !== first && !['Files', 'OSInternet'].includes(button.getAttribute('aria-label')));
+      const before = apps.map((button) => button.getAttribute('aria-label'));
+      const transfer = new DataTransfer();
+      first.dispatchEvent(new DragEvent('dragstart', {bubbles:true,dataTransfer:transfer}));
+      const bounds = second.getBoundingClientRect();
+      second.dispatchEvent(new DragEvent('dragover', {bubbles:true,cancelable:true,dataTransfer:transfer,clientX:bounds.right-1,clientY:bounds.top+4}));
+      shelf.dispatchEvent(new DragEvent('drop', {bubbles:true,cancelable:true,dataTransfer:transfer}));
+      first.dispatchEvent(new DragEvent('dragend', {bubbles:true,dataTransfer:transfer}));
+      const after = [...shelf.querySelectorAll('.shelf-icon, .astore-shelf-button, .aos-filedrop-taskbar')].map((button) => button.getAttribute('aria-label'));
+      const search = shelf.querySelector('.search-pill');
+      const status = shelf.querySelector('.status');
+      const launcher = shelf.querySelector('.launcher-button');
+      const controlTarget = shelf.querySelector('[data-aos-taskbar-drag="ready"]:not(.search-pill)');
+      const controlBefore = [...shelf.querySelectorAll('[data-aos-taskbar-drag="ready"]')].indexOf(search);
+      const controlTransfer = new DataTransfer();
+      search.dispatchEvent(new DragEvent('dragstart', {bubbles:true,dataTransfer:controlTransfer}));
+      const controlBounds = controlTarget.getBoundingClientRect();
+      controlTarget.dispatchEvent(new DragEvent('dragover', {bubbles:true,cancelable:true,dataTransfer:controlTransfer,clientX:controlBounds.left+1,clientY:controlBounds.top+4}));
+      shelf.dispatchEvent(new DragEvent('drop', {bubbles:true,cancelable:true,dataTransfer:controlTransfer}));
+      search.dispatchEvent(new DragEvent('dragend', {bubbles:true,dataTransfer:controlTransfer}));
+      const controlAfter = [...shelf.querySelectorAll('[data-aos-taskbar-drag="ready"]')].indexOf(search);
+      const settings = ${appButton("Settings")};
+      const icon = settings.querySelector('img') ? settings.querySelector('img').src : '';
+      api.createDesktopShortcut('Settings', icon, 500, 180);
+      api.addShortcutFile('Settings', icon);
+      api.addBrowserPin('Settings', icon);
+      const layer = document.querySelector('#aos-desktop-widgets-layer');
+      layer.querySelectorAll('.aos-taskbar-smoke-widget').forEach((item) => item.remove());
+      for (const name of ['Smoke one', 'Smoke two']) {
+        const widget = document.createElement('div');
+        widget.className = 'aos-taskbar-smoke-widget';
+        widget.style.cssText = 'position:absolute;left:24px;top:24px;width:190px;height:100px;background:#fff;';
+        widget.innerHTML = '<span class="truncate">' + name + '</span>';
+        layer.appendChild(widget);
+      }
+      localStorage.removeItem('aos-widget-safe-positions');
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      api.resolveWidgets();
+      await new Promise((resolve) => setTimeout(resolve, 260));
+      const widgets = [...layer.querySelectorAll('.aos-taskbar-smoke-widget')].map((item) => item.getBoundingClientRect());
+      const reservedElements = [...document.querySelectorAll('.desktop-files > button, .desk-shortcut, .wallmark img, .shelf')];
+      const reserved = reservedElements.map((item) => item.getBoundingClientRect());
+      const overlap = (a, b) => a.left < b.right + 1 && a.right + 1 > b.left && a.top < b.bottom + 1 && a.bottom + 1 > b.top;
+      const widgetSafe = widgets.length === 2 && !overlap(widgets[0], widgets[1]) && widgets.every((widget) => reserved.every((item) => !overlap(widget, item)));
+      const soundFiles = JSON.parse(localStorage.getItem('aos-files') || '[]');
+      const soundResponses = await Promise.all(['/assets/sounds/aos-4-notification.mp4', '/assets/sounds/aos-4-ringtone.mp4'].map((url) => fetch(url)));
+      return {
+        referenceHidden: !document.querySelector('.aos-taskbar-reference'),
+        layout: document.querySelector('.desktop').classList.contains('aos-taskbar-layout-floating-segmented'),
+        size: localStorage.getItem('aos-taskbar-size') === '76',
+        reorder: before.join('|') !== after.join('|'),
+        draggable: apps.every((button) => button.draggable),
+        controlReorder: controlBefore !== controlAfter,
+        controlsDraggable: [search, status, launcher].every((item) => item && item.draggable),
+        shortcut: Boolean(document.querySelector('.aos-taskbar-desktop-shortcut')),
+        file: JSON.parse(localStorage.getItem('aos-files') || '[]').some((file) => file.name === 'Settings.aoslink'),
+        pins: JSON.parse(localStorage.getItem('aos-taskbar-browser-pins') || '[]').some((pin) => pin.label === 'Settings'),
+        widgets: widgetSafe,
+        status: Boolean(document.querySelector('.status.aos-status-modern .aos-status-date')),
+        handle: Boolean(document.querySelector('.aos-taskbar-resize-handle')),
+        sounds: localStorage.getItem('aos-notification-tone') === 'file:aos-4-default-notification' && localStorage.getItem('aos-ringtone-tone') === 'file:aos-4-default-ringtone' && soundFiles.some((file) => file.id === 'aos-4-default-notification' && file.parent === 'os-root') && soundFiles.some((file) => file.id === 'aos-4-default-ringtone' && file.parent === 'os-root') && soundResponses.every((response) => response.ok),
+        widgetDetail: widgetSafe ? null : {
+          widgets: widgets.map((rect) => ({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom})),
+          hits: reservedElements.filter((item, index) => widgets.some((widget) => overlap(widget, reserved[index]))).map((item) => {
+            const rect = item.getBoundingClientRect();
+            return {name:item.getAttribute('aria-label') || item.className,left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom};
+          }),
+          dragging: layer.dataset.aosWidgetDragging || '',
+          reservedCount: reserved.length,
+          saved: localStorage.getItem('aos-widget-safe-positions'),
+          desktop: (() => { const rect = document.querySelector('.desktop').getBoundingClientRect(); return {left:rect.left,top:rect.top,width:rect.width,height:rect.height}; })()
+        }
+      };
+    })()`);
+    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "shortcut", "file", "pins", "widgets", "status", "handle", "sounds"];
+    if (taskbarChecks.some((key) => taskbarResult[key] !== true)) {
+      throw new Error(`Taskbar studio regression: ${JSON.stringify(taskbarResult)}`);
+    }
+    await evaluate(`${appButton("OSInternet")}.click()`);
+    await waitFor(`Boolean(document.querySelector('.browser-bookmarks .aos-app-browser-pin'))`, "the app pin inside OSInternet");
+    console.log("PASS: A-OS 4.0 taskbar controls, sounds, resizing, desktop/Files/browser drops and widget collision avoidance");
+    cdp.socket.close();
+    return;
+  }
+
   if (nativeIso) {
     await evaluate(`document.querySelector(".shelf button.status").click()`);
     await waitFor(`Boolean(document.querySelector(".quick"))`, "the ISO quick settings panel");
@@ -264,6 +362,14 @@ async function main() {
   await waitFor(
     `Boolean(document.querySelector('.aos-filedrop-offline'))`,
     "FileDrop's native-service guidance"
+  );
+  await evaluate(`(() => {
+    const toggle = document.querySelector('.aos-filedrop-window [data-fd-enabled]');
+    if (!toggle.checked) toggle.click();
+  })()`);
+  await waitFor(
+    `document.querySelector('.aos-filedrop-window [data-fd-enabled]').checked && JSON.parse(localStorage.getItem('aos-filedrop-browser-state') || '{}').enabled === true`,
+    "FileDrop to stay enabled in browser mode"
   );
   await evaluate(`document.querySelector('.aos-filedrop-window [data-fd-close]').click()`);
   await waitFor(
