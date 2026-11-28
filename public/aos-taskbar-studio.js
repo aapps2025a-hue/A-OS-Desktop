@@ -18,6 +18,7 @@
     {id: "wide-classic", name: "Wide classic"}
   ];
   var draggingApp = null;
+  var pointerSort = null;
   var scheduled = false;
   var resolvingWidgets = false;
   var statusTimer = 0;
@@ -340,6 +341,90 @@
       saveTaskbarOrder(shelf);
       draggingApp = null;
     });
+    installPointerSort(item, shelf);
+  }
+
+  function dragDescription(item) {
+    var app = isShelfApp(item);
+    return {
+      isApp: app,
+      label: app ? item.getAttribute("aria-label") : shelfControlKey(item).replace("control:", ""),
+      icon: app ? iconSource(item) : "",
+      source: item,
+      key: shelfItemKey(item)
+    };
+  }
+
+  function movePointerSortedItem(event, shelf) {
+    if (!pointerSort || !pointerSort.active) return;
+    var point = document.elementFromPoint(event.clientX, event.clientY);
+    var target = point && point.closest && point.closest("[data-aos-taskbar-drag='ready']");
+    if (target && target.parentElement === shelf && target !== pointerSort.item) {
+      var bounds = target.getBoundingClientRect();
+      var desktop = shelf.closest(".desktop");
+      var vertical = desktop.classList.contains("shelf-left") || desktop.classList.contains("shelf-right");
+      var before = vertical ? event.clientY < bounds.top + bounds.height / 2 : event.clientX < bounds.left + bounds.width / 2;
+      shelf.insertBefore(pointerSort.item, before ? target : target.nextSibling);
+      return;
+    }
+    var shelfBounds = shelf.getBoundingClientRect();
+    if (event.clientX >= shelfBounds.left && event.clientX <= shelfBounds.right && event.clientY >= shelfBounds.top && event.clientY <= shelfBounds.bottom) {
+      var anchor = shelf.querySelector(":scope > .aos-taskbar-resize-handle");
+      shelf.insertBefore(pointerSort.item, anchor || null);
+    }
+  }
+
+  function finishPointerSort(event) {
+    if (!pointerSort || event.pointerId !== pointerSort.pointerId) return;
+    var current = pointerSort;
+    window.removeEventListener("pointermove", pointerSort.move, true);
+    window.removeEventListener("pointerup", finishPointerSort, true);
+    window.removeEventListener("pointercancel", finishPointerSort, true);
+    if (current.active) {
+      current.item.classList.remove("aos-taskbar-dragging", "aos-taskbar-pointer-dragging");
+      current.item.dataset.aosSuppressClick = "true";
+      saveTaskbarOrder(current.shelf);
+      window.setTimeout(function () { delete current.item.dataset.aosSuppressClick; }, 120);
+    }
+    pointerSort = null;
+    draggingApp = null;
+  }
+
+  function installPointerSort(item, shelf) {
+    if (item.dataset.aosPointerSort === "ready") return;
+    item.dataset.aosPointerSort = "ready";
+    item.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0 || event.pointerType === "touch" && event.isPrimary === false) return;
+      var startX = event.clientX;
+      var startY = event.clientY;
+      pointerSort = {
+        item: item,
+        shelf: shelf,
+        pointerId: event.pointerId,
+        active: false,
+        move: function (moveEvent) {
+          if (!pointerSort || moveEvent.pointerId !== pointerSort.pointerId) return;
+          var distance = Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY);
+          if (!pointerSort.active && distance < 7) return;
+          if (!pointerSort.active) {
+            pointerSort.active = true;
+            draggingApp = dragDescription(item);
+            item.classList.add("aos-taskbar-dragging", "aos-taskbar-pointer-dragging");
+            if (document.activeElement && item.contains(document.activeElement)) document.activeElement.blur();
+          }
+          moveEvent.preventDefault();
+          movePointerSortedItem(moveEvent, shelf);
+        }
+      };
+      window.addEventListener("pointermove", pointerSort.move, true);
+      window.addEventListener("pointerup", finishPointerSort, true);
+      window.addEventListener("pointercancel", finishPointerSort, true);
+    });
+    item.addEventListener("click", function (event) {
+      if (item.dataset.aosSuppressClick !== "true") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
   }
 
   function installShelfDragAndDrop(shelf) {

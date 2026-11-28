@@ -247,7 +247,7 @@
     if (document.querySelector('link[href*="aos-cursors.css"]')) return;
     var stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = "./aos-cursors.css?v=20261127-cursors3";
+    stylesheet.href = "./aos-cursors.css?v=20261128-custom-upload";
     document.head.appendChild(stylesheet);
   }
 
@@ -258,8 +258,11 @@
   }
 
   var DEFAULT_CURSOR_COLOUR = "#169bd5";
+  var CUSTOM_CURSOR_KEY = "aos-pointer-custom";
   var baseCursor = new Image();
+  var customCursor = new Image();
   var cursorReady = false;
+  var customCursorReady = false;
 
   if (!localStorage.getItem("aos-pointer-colour")) {
     localStorage.setItem("aos-pointer-colour", DEFAULT_CURSOR_COLOUR);
@@ -307,15 +310,48 @@
     return {url: canvas.toDataURL("image/png"), hotspot: hotspot};
   }
 
+  function drawCustomPointer(size) {
+    var canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    var context = canvas.getContext("2d");
+    var scale = Math.min(size / customCursor.naturalWidth, size / customCursor.naturalHeight);
+    var width = Math.max(1, Math.round(customCursor.naturalWidth * scale));
+    var height = Math.max(1, Math.round(customCursor.naturalHeight * scale));
+    context.drawImage(customCursor, 0, 0, width, height);
+    return {url: canvas.toDataURL("image/png"), hotspot: {x: Math.min(4, width - 1), y: Math.min(4, height - 1)}};
+  }
+
+  function customCursorSource() {
+    var source = localStorage.getItem(CUSTOM_CURSOR_KEY) || "";
+    return /^data:image\/(?:png|webp);base64,/i.test(source) ? source : "";
+  }
+
+  function loadCustomCursor() {
+    var source = customCursorSource();
+    customCursorReady = false;
+    if (!source) return;
+    if (customCursor.src === source && customCursor.complete && customCursor.naturalWidth) {
+      customCursorReady = true;
+      return;
+    }
+    customCursor.src = source;
+  }
+
   function applyNativeCursor() {
     if (!cursorReady) return;
     var scale = clamp(Number(pointerSetting("--pointer-size", localStorage.getItem("aos-pointer-size") || "1")) || 1, 0.7, 2);
     var colour = pointerSetting("--pointer-colour", localStorage.getItem("aos-pointer-colour") || DEFAULT_CURSOR_COLOUR);
     var shape = document.documentElement.dataset.pointer || localStorage.getItem("aos-pointer-image") || "arrow";
-    if (["arrow", "dot", "ring"].indexOf(shape) === -1) shape = "arrow";
+    if (["arrow", "dot", "ring", "custom"].indexOf(shape) === -1) shape = "arrow";
+    if (shape === "custom" && !customCursorSource()) shape = "arrow";
 
-    var pointer = drawPointer(clamp(Math.round(48 * scale), 32, 96), shape, colour, true);
-    var preview = drawPointer(48, shape, colour, true);
+    if (shape === "custom" && !customCursorReady) {
+      loadCustomCursor();
+      return;
+    }
+    var pointer = shape === "custom" ? drawCustomPointer(clamp(Math.round(48 * scale), 32, 96)) : drawPointer(clamp(Math.round(48 * scale), 32, 96), shape, colour, true);
+    var preview = shape === "custom" ? drawCustomPointer(48) : drawPointer(48, shape, colour, true);
     var cursorValue = 'url("' + pointer.url + '") ' + pointer.hotspot.x + " " + pointer.hotspot.y + ", default";
     var previewValue = 'url("' + preview.url + '")';
     if (document.documentElement.style.getPropertyValue("--aos-cursor-arrow") !== cursorValue) {
@@ -328,9 +364,106 @@
 
   baseCursor.addEventListener("load", function () {
     cursorReady = true;
+    loadCustomCursor();
     applyNativeCursor();
   }, {once: true});
   baseCursor.src = new URL("./assets/cursors/cursor.png", document.baseURI).href;
+
+  customCursor.addEventListener("load", function () {
+    customCursorReady = true;
+    applyNativeCursor();
+    updateCustomCursorControls();
+  });
+
+  function notify(message) {
+    window.dispatchEvent(new CustomEvent("aos-notification", {detail: {message: message}}));
+  }
+
+  function imageFileData(file) {
+    return new Promise(function (resolve, reject) {
+      if (!file || !/^image\/(?:png|webp|jpeg|gif|svg\+xml)$/i.test(file.type || "")) {
+        reject(new Error("Choose a PNG, WebP, JPG, GIF, or SVG pointer image."));
+        return;
+      }
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error("A-OS could not read that pointer image.")); };
+      reader.onload = function () {
+        var image = new Image();
+        image.onerror = function () { reject(new Error("That image cannot be used as a pointer.")); };
+        image.onload = function () {
+          var canvas = document.createElement("canvas");
+          canvas.width = 128;
+          canvas.height = 128;
+          var context = canvas.getContext("2d");
+          var scale = Math.min(128 / image.naturalWidth, 128 / image.naturalHeight, 1);
+          var width = Math.max(1, Math.round(image.naturalWidth * scale));
+          var height = Math.max(1, Math.round(image.naturalHeight * scale));
+          context.drawImage(image, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        image.src = String(reader.result || "");
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function installCustomPointer(file) {
+    try {
+      var data = await imageFileData(file);
+      localStorage.setItem(CUSTOM_CURSOR_KEY, data);
+      localStorage.setItem("aos-pointer-image", "custom");
+      document.documentElement.dataset.pointer = "custom";
+      customCursor.src = data;
+      notify("Your custom mouse pointer is ready");
+      updateCustomCursorControls();
+    } catch (error) {
+      notify(error.message || "That pointer image could not be installed");
+    }
+  }
+
+  function updateCustomCursorControls() {
+    var source = customCursorSource();
+    document.querySelectorAll(".aos-custom-pointer-setting").forEach(function (section) {
+      var preview = section.querySelector(".aos-custom-pointer-preview");
+      var use = section.querySelector("[data-aos-use-custom-pointer]");
+      var reset = section.querySelector("[data-aos-reset-custom-pointer]");
+      if (preview) preview.style.backgroundImage = source ? 'url("' + source + '")' : "";
+      if (use) use.disabled = !source;
+      if (reset) reset.disabled = !source;
+      section.dataset.ready = source ? "true" : "false";
+    });
+  }
+
+  function addCustomCursorSettings() {
+    document.querySelectorAll(".pointer-images").forEach(function (pointerImages) {
+      var parent = pointerImages.parentElement;
+      if (!parent || parent.querySelector(":scope > .aos-custom-pointer-setting")) return;
+      var section = document.createElement("section");
+      section.className = "aos-custom-pointer-setting";
+      section.innerHTML = '<span class="aos-custom-pointer-preview" aria-hidden="true"></span><span><b>Custom mouse pointer</b><small>Upload a transparent image and use it across A-OS</small></span><label class="aos-custom-pointer-upload"><input type="file" accept="image/png,image/webp,image/jpeg,image/gif,image/svg+xml" data-aos-allowed-picker="true"><i>Upload pointer</i></label><button type="button" data-aos-use-custom-pointer>Use custom</button><button type="button" data-aos-reset-custom-pointer aria-label="Remove custom pointer">Reset</button>';
+      section.querySelector("input").addEventListener("change", function (event) {
+        var file = event.target.files && event.target.files[0];
+        if (file) installCustomPointer(file);
+        event.target.value = "";
+      });
+      section.querySelector("[data-aos-use-custom-pointer]").addEventListener("click", function () {
+        if (!customCursorSource()) return;
+        localStorage.setItem("aos-pointer-image", "custom");
+        document.documentElement.dataset.pointer = "custom";
+        scheduleCursorUpdate();
+      });
+      section.querySelector("[data-aos-reset-custom-pointer]").addEventListener("click", function () {
+        localStorage.removeItem(CUSTOM_CURSOR_KEY);
+        localStorage.setItem("aos-pointer-image", "arrow");
+        document.documentElement.dataset.pointer = "arrow";
+        customCursorReady = false;
+        updateCustomCursorControls();
+        scheduleCursorUpdate();
+      });
+      pointerImages.insertAdjacentElement("afterend", section);
+      updateCustomCursorControls();
+    });
+  }
 
   var cursorUpdatePending = false;
   function scheduleCursorUpdate() {
@@ -346,5 +479,28 @@
     attributes: true,
     attributeFilter: ["style", "data-pointer"]
   });
-  window.addEventListener("storage", scheduleCursorUpdate);
+  function watchCustomCursorSettings() {
+    if (!document.body) return;
+    var settingsObserver = new MutationObserver(addCustomCursorSettings);
+    settingsObserver.observe(document.body, {childList: true, subtree: true});
+    addCustomCursorSettings();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", watchCustomCursorSettings, {once: true});
+  else watchCustomCursorSettings();
+  window.addEventListener("storage", function (event) {
+    if (event.key === CUSTOM_CURSOR_KEY) loadCustomCursor();
+    scheduleCursorUpdate();
+    updateCustomCursorControls();
+  });
+  window.AOS_POINTERS = {
+    install: installCustomPointer,
+    useCustom: function () {
+      if (!customCursorSource()) return false;
+      localStorage.setItem("aos-pointer-image", "custom");
+      document.documentElement.dataset.pointer = "custom";
+      scheduleCursorUpdate();
+      return true;
+    },
+    hasCustom: function () { return Boolean(customCursorSource()); }
+  };
 })();

@@ -299,7 +299,8 @@ async function main() {
       const overlap = (a, b) => a.left < b.right + 1 && a.right + 1 > b.left && a.top < b.bottom + 1 && a.bottom + 1 > b.top;
       const widgetSafe = widgets.length === 2 && !overlap(widgets[0], widgets[1]) && widgets.every((widget) => reserved.every((item) => !overlap(widget, item)));
       const soundFiles = JSON.parse(localStorage.getItem('aos-files') || '[]');
-      const soundResponses = await Promise.all(['/assets/sounds/aos-4-notification.mp4', '/assets/sounds/aos-4-ringtone.mp4'].map((url) => fetch(url)));
+      const soundResponses = await Promise.all(['/assets/sounds/aos-4-notification.wav', '/assets/sounds/aos-4-ringtone.wav'].map((url) => fetch(url)));
+      const customPointerControl = document.querySelector('.aos-custom-pointer-setting');
       return {
         referenceHidden: !document.querySelector('.aos-taskbar-reference'),
         layout: document.querySelector('.desktop').classList.contains('aos-taskbar-layout-floating-segmented'),
@@ -308,13 +309,15 @@ async function main() {
         draggable: apps.every((button) => button.draggable),
         controlReorder: controlBefore !== controlAfter,
         controlsDraggable: [search, status, launcher].every((item) => item && item.draggable),
+        pointerSort: search && search.dataset.aosPointerSort === 'ready',
+        customPointer: Boolean(window.AOS_POINTERS && customPointerControl && customPointerControl.querySelector('input[type="file"][data-aos-allowed-picker="true"]:not(:disabled)')),
         shortcut: Boolean(document.querySelector('.aos-taskbar-desktop-shortcut')),
         file: JSON.parse(localStorage.getItem('aos-files') || '[]').some((file) => file.name === 'Settings.aoslink'),
         pins: JSON.parse(localStorage.getItem('aos-taskbar-browser-pins') || '[]').some((pin) => pin.label === 'Settings'),
         widgets: widgetSafe,
         status: Boolean(document.querySelector('.status.aos-status-modern .aos-status-date')),
         handle: Boolean(document.querySelector('.aos-taskbar-resize-handle')),
-        sounds: localStorage.getItem('aos-notification-tone') === 'file:aos-4-default-notification' && localStorage.getItem('aos-ringtone-tone') === 'file:aos-4-default-ringtone' && soundFiles.some((file) => file.id === 'aos-4-default-notification' && file.parent === 'os-root') && soundFiles.some((file) => file.id === 'aos-4-default-ringtone' && file.parent === 'os-root') && soundResponses.every((response) => response.ok),
+        sounds: localStorage.getItem('aos-notification-tone') === 'file:aos-4-default-notification' && localStorage.getItem('aos-ringtone-tone') === 'file:aos-4-default-ringtone' && soundFiles.some((file) => file.id === 'aos-4-default-notification' && file.parent === 'os-root' && file.mime === 'audio/wav' && /\.wav$/i.test(file.name)) && soundFiles.some((file) => file.id === 'aos-4-default-ringtone' && file.parent === 'os-root' && file.mime === 'audio/wav' && /\.wav$/i.test(file.name)) && soundResponses.every((response) => response.ok),
         widgetDetail: widgetSafe ? null : {
           widgets: widgets.map((rect) => ({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom})),
           hits: reservedElements.filter((item, index) => widgets.some((widget) => overlap(widget, reserved[index]))).map((item) => {
@@ -328,7 +331,7 @@ async function main() {
         }
       };
     })()`);
-    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "shortcut", "file", "pins", "widgets", "status", "handle", "sounds"];
+    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "pointerSort", "customPointer", "shortcut", "file", "pins", "widgets", "status", "handle", "sounds"];
     if (taskbarChecks.some((key) => taskbarResult[key] !== true)) {
       throw new Error(`Taskbar studio regression: ${JSON.stringify(taskbarResult)}`);
     }
@@ -361,8 +364,26 @@ async function main() {
   );
   await waitFor(
     `Boolean(document.querySelector('.aos-filedrop-offline'))`,
-    "FileDrop's native-service guidance"
+    "FileDrop's browser transfer guidance"
   );
+  const fileDropBrowser = await evaluate(`(async () => {
+    const upload = document.querySelector('.aos-filedrop-window [data-fd-upload]');
+    const picker = document.querySelector('.aos-filedrop-window [data-fd-upload-input]');
+    const windowRect = document.querySelector('.aos-filedrop-window').getBoundingClientRect();
+    await window.AOS_FILEDROP.importFiles([new File(['FileDrop browser test'], 'browser-filedrop.txt', {type:'text/plain'})]);
+    const files = JSON.parse(localStorage.getItem('aos-files') || '[]');
+    return {
+      noExe: document.querySelector('.aos-filedrop-window').textContent.includes('No app or EXE needed'),
+      upload: Boolean(upload),
+      picker: Boolean(picker && picker.dataset.aosAllowedPicker === 'true' && !picker.disabled),
+      fits: windowRect.top >= 0 && windowRect.bottom <= innerHeight,
+      bounds: {top: windowRect.top, bottom: windowRect.bottom, height: windowRect.height, viewport: innerHeight},
+      imported: files.some((file) => file.name === 'browser-filedrop.txt' && file.parent === 'downloads')
+    };
+  })()`);
+  if (!fileDropBrowser.noExe || !fileDropBrowser.upload || !fileDropBrowser.picker || !fileDropBrowser.fits || !fileDropBrowser.imported) {
+    throw new Error(`FileDrop browser mode regression: ${JSON.stringify(fileDropBrowser)}`);
+  }
   await evaluate(`(() => {
     const toggle = document.querySelector('.aos-filedrop-window [data-fd-enabled]');
     if (!toggle.checked) toggle.click();

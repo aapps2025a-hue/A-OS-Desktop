@@ -22,9 +22,10 @@
   function readBrowserSettings() {
     var fallbackName = "A-OS Computer";
     try {
-      var saved = JSON.parse(localStorage.getItem(BROWSER_STATE_KEY) || "{}");
+      var raw = localStorage.getItem(BROWSER_STATE_KEY);
+      var saved = JSON.parse(raw || "{}");
       return {
-        enabled: Boolean(saved.enabled),
+        enabled: raw === null ? true : saved.enabled !== false,
         name: String(saved.name || fallbackName).slice(0, 80)
       };
     } catch (_) {
@@ -106,6 +107,45 @@
       reader.onerror = function () { reject(reader.error || new Error("Could not read the received file.")); };
       reader.readAsDataURL(blob);
     });
+  }
+
+  async function importLocalFiles(fileList) {
+    var incoming = Array.from(fileList || []).slice(0, 12);
+    if (!incoming.length) return;
+    var files = parseFiles();
+    var added = [];
+    for (var index = 0; index < incoming.length; index += 1) {
+      var file = incoming[index];
+      if (file.size > 15 * 1024 * 1024) {
+        setStatus(file.name + " is larger than the 15 MB browser-transfer limit", true);
+        continue;
+      }
+      var name = uniqueAosName(file.name || "Uploaded file");
+      var stored = {
+        id: crypto.randomUUID ? crypto.randomUUID() : "filedrop-upload-" + Date.now() + "-" + index,
+        name: name,
+        type: "file",
+        parent: "downloads",
+        content: await blobDataUrl(file),
+        mime: file.type || "application/octet-stream",
+        size: file.size,
+        icon: /image\//i.test(file.type) ? "Images.png" : /video\//i.test(file.type) ? "Video.png" : /audio\//i.test(file.type) ? "Music.png" : "Downloads.png",
+        fileDropSource: "This device"
+      };
+      files.push(stored);
+      added.push(stored);
+    }
+    if (!added.length) return;
+    try { localStorage.setItem("aos-files", JSON.stringify(files)); }
+    catch (_) {
+      setStatus("A-OS browser storage is full. Remove a large file and try again.", true);
+      return;
+    }
+    added.forEach(function (file) { selectedFiles.add(String(file.id)); });
+    window.dispatchEvent(new CustomEvent("aos-files-change"));
+    setStatus(added.length === 1 ? added[0].name + " is ready to send" : added.length + " files are ready to send", false);
+    notify(added.length === 1 ? added[0].name + " added to FileDrop" : added.length + " files added to FileDrop");
+    render();
   }
 
   async function addReceivedToAos(transferId) {
@@ -210,7 +250,7 @@
 
     var html = "";
     if (state.browserMode) {
-      html += '<section class="aos-filedrop-offline aos-filedrop-browser-mode"><div><img src="' + ICON + '" alt=""><h2>FileDrop browser mode</h2><p>The switch works here and A-OS remembers it. Start the FileDrop desktop service to discover and send to computers on your local network.</p></div></section>';
+      html += '<section class="aos-filedrop-offline aos-filedrop-browser-mode"><div><img src="' + ICON + '" alt=""><h2>No app or EXE needed</h2><p>Open A-OS FileDrop in a browser on the other device and sign in with the same A-Applications account. Incoming files are saved in Downloads.</p></div><button type="button" class="aos-filedrop-primary" data-fd-upload>Upload from this device</button></section>';
     }
     if (pending.length) {
       html += '<section class="aos-filedrop-section"><header><h3>Waiting for you</h3><small>Accept only files you expect</small></header><div class="aos-filedrop-incoming">';
@@ -219,12 +259,17 @@
       });
       html += "</div></section>";
     }
-    html += '<section class="aos-filedrop-section"><header><h3>Nearby devices</h3><small>' + (state.browserMode ? "Browser mode" : state.enabled ? "Same local network" : "FileDrop is off") + '</small></header><div class="aos-filedrop-grid">';
-    if (!peers.length) html += '<div class="aos-filedrop-empty">' + (state.enabled ? state.browserMode ? "FileDrop is on. Start the desktop service to find nearby devices." : "Looking for A-OS, Windows, and Mac devices…" : "Enable FileDrop to find devices.") + '</div>';
-    peers.forEach(function (peer) {
-      html += '<button class="aos-filedrop-peer" aria-pressed="' + (peer.id === selectedPeer) + '" data-peer="' + escapeHtml(peer.id) + '"><img src="' + platformIcon(peer) + '" alt=""><span><b>' + escapeHtml(peer.name) + '</b><small>' + escapeHtml(peer.platform) + '</small></span></button>';
-    });
-    html += '</div></section><section class="aos-filedrop-section"><header><h3>A-OS Files</h3><small>Select one or more files</small></header><div class="aos-filedrop-grid">';
+    if (state.browserMode) {
+      html += '<section class="aos-filedrop-section aos-filedrop-browser-direct"><header><h3>Receive files</h3><small>Ready in this browser</small></header><div class="aos-filedrop-receive-ready"><img src="' + ICON + '" alt=""><span><b>' + (state.enabled ? "Waiting for files" : "FileDrop is paused") + '</b><small>' + (state.enabled ? "Keep this browser open. A-OS will ask before another account or device can access anything." : "Turn on FileDrop to receive files in this browser.") + '</small></span></div></section>';
+    } else {
+      html += '<section class="aos-filedrop-section"><header><h3>Nearby devices</h3><small>' + (state.enabled ? "Same local network" : "FileDrop is off") + '</small></header><div class="aos-filedrop-grid">';
+      if (!peers.length) html += '<div class="aos-filedrop-empty">' + (state.enabled ? "Looking for A-OS, Windows, and Mac devices…" : "Enable FileDrop to find devices.") + '</div>';
+      peers.forEach(function (peer) {
+        html += '<button class="aos-filedrop-peer" aria-pressed="' + (peer.id === selectedPeer) + '" data-peer="' + escapeHtml(peer.id) + '"><img src="' + platformIcon(peer) + '" alt=""><span><b>' + escapeHtml(peer.name) + '</b><small>' + escapeHtml(peer.platform) + '</small></span></button>';
+      });
+      html += '</div></section>';
+    }
+    html += '<section class="aos-filedrop-section"><header><h3>A-OS Files</h3><span class="aos-filedrop-file-actions"><small>Select a file</small><button type="button" class="aos-filedrop-quiet" data-fd-upload>Upload</button></span></header><div class="aos-filedrop-grid">';
     if (!files.length) html += '<div class="aos-filedrop-empty">There are no files to send yet. Add a file in A-OS Files first.</div>';
     files.slice(0, 80).forEach(function (file) {
       var id = String(file.id || file.name);
@@ -241,40 +286,16 @@
       });
       html += "</div></section>";
     }
-    html += '<footer class="aos-filedrop-sendbar"><span>' + (selectedFiles.size ? selectedFiles.size + " selected" : "Choose files and a nearby device") + '</span><button class="aos-filedrop-primary" data-send ' + (!selectedPeer || !selectedFiles.size || !state.enabled ? "disabled" : "") + '>Send files</button></footer>';
+    var sendDisabled = !selectedFiles.size || !state.enabled || (!state.browserMode && !selectedPeer);
+    html += '<footer class="aos-filedrop-sendbar"><span>' + (selectedFiles.size ? selectedFiles.size + " selected" : state.browserMode ? "Upload or choose a file" : "Choose files and a nearby device") + '</span><button class="aos-filedrop-primary" data-send ' + (sendDisabled ? "disabled" : "") + '>' + (state.browserMode ? "Choose device and send" : "Send files") + '</button></footer>';
     mainElement.innerHTML = html;
   }
 
   async function refresh() {
     if (!windowElement || windowElement.hidden) return;
-    try {
-      state = await request("/api/state");
-      var saved = readBrowserSettings();
-      if (saved.enabled && !state.enabled) {
-        state = await request("/api/enable", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({enabled: true})});
-      }
-      saveBrowserSettings({enabled: state.enabled, name: state.device && state.device.name});
-      (state.transfers || []).forEach(function (item) {
-        if (item.direction === "incoming" && item.state === "pending" && !notifiedOffers.has(item.id)) {
-          notifiedOffers.add(item.id);
-          notify((item.peerName || "Another device") + " wants to send " + item.name);
-        }
-        if (item.direction === "incoming" && item.state === "complete" && !notifiedComplete.has(item.id)) {
-          notifiedComplete.add(item.id);
-          notify(item.name + " was received and verified");
-        }
-      });
-      render();
-      setStatus(state.enabled ? "Ready on your local network" : "FileDrop is off", false);
-    } catch (error) {
-      if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") {
-        state = browserState();
-        render();
-        setStatus(state.enabled ? "FileDrop is on in browser mode" : "FileDrop is off", false);
-      } else {
-        setStatus(error.message || "FileDrop is unavailable", true);
-      }
-    }
+    state = browserState();
+    render();
+    setStatus(state.enabled ? "Ready to send and receive in your browser" : "FileDrop is off", false);
   }
 
   function startPolling() {
@@ -284,8 +305,21 @@
   }
 
   async function sendSelected() {
-    if (!selectedPeer || !selectedFiles.size) return;
+    if (!selectedFiles.size) return;
     var files = parseFiles().filter(function (file) { return selectedFiles.has(String(file.id || file.name)); });
+    if (state && state.browserMode) {
+      var file = files[0];
+      if (!file) return;
+      if (!window.AOS_NEARBY_SHARE || typeof window.AOS_NEARBY_SHARE.open !== "function") {
+        setStatus("Browser sharing is still starting. Try again in a moment.", true);
+        return;
+      }
+      window.AOS_NEARBY_SHARE.open(file);
+      if (files.length > 1) setStatus("Choose a device for " + file.name + ". Send additional files one at a time.", false);
+      else setStatus("Choose the receiving browser", false);
+      return;
+    }
+    if (!selectedPeer) return;
     setStatus("Preparing " + files.length + (files.length === 1 ? " file…" : " files…"), false);
     try {
       for (var index = 0; index < files.length; index += 1) {
@@ -318,6 +352,11 @@
         render();
         return;
       }
+      if (event.target.closest("[data-fd-upload]")) {
+        var picker = windowElement.querySelector("[data-fd-upload-input]");
+        if (picker) picker.click();
+        return;
+      }
       var accept = event.target.closest("[data-accept]");
       var reject = event.target.closest("[data-reject]");
       try {
@@ -344,6 +383,7 @@
       var bounds = windowElement.getBoundingClientRect();
       drag = {x: event.clientX, y: event.clientY, left: bounds.left, top: bounds.top};
       titlebar.setPointerCapture(event.pointerId);
+      windowElement.classList.add("aos-filedrop-positioned");
       windowElement.style.transform = "none";
       windowElement.style.left = bounds.left + "px";
       windowElement.style.top = bounds.top + "px";
@@ -414,7 +454,7 @@
     windowElement.className = "system-window aos-filedrop-window";
     windowElement.hidden = true;
     windowElement.setAttribute("data-app", "FileDrop");
-    windowElement.innerHTML = '<header class="aos-filedrop-titlebar"><img src="' + ICON + '" alt=""><span><strong>FileDrop</strong><small>Files between A-OS, Windows, and Mac</small></span><div class="aos-filedrop-controls"><button type="button" data-fd-minimize aria-label="Minimize">−</button><button type="button" data-fd-maximize aria-label="Maximize">□</button><button type="button" data-fd-close aria-label="Close">×</button></div></header><div class="aos-filedrop-body"><aside class="aos-filedrop-sidebar"><div class="aos-filedrop-device-mark"><img src="' + ICON + '" alt=""></div><h2>FileDrop</h2><p>Nearby file sharing that keeps you in control.</p><div class="aos-filedrop-toggle"><span><b>Enable FileDrop</b><small>Let nearby devices find this A-OS</small></span><label class="aos-filedrop-switch"><input type="checkbox" data-fd-enabled><i></i></label></div><div class="aos-filedrop-name"><label for="aos-filedrop-device-name">Device name</label><div><input id="aos-filedrop-device-name" maxlength="80"><button type="button" data-fd-save-name aria-label="Save device name">✓</button></div></div><p class="aos-filedrop-path" data-fd-path></p><div class="aos-filedrop-status" data-fd-status role="status"></div></aside><main class="aos-filedrop-main"></main></div><div class="aos-filedrop-resize" aria-hidden="true"></div>';
+    windowElement.innerHTML = '<header class="aos-filedrop-titlebar"><img src="' + ICON + '" alt=""><span><strong>FileDrop</strong><small>Browser-to-browser files for A-OS, Windows, and Mac</small></span><div class="aos-filedrop-controls"><button type="button" data-fd-minimize aria-label="Minimize">−</button><button type="button" data-fd-maximize aria-label="Maximize">□</button><button type="button" data-fd-close aria-label="Close">×</button></div></header><div class="aos-filedrop-body"><aside class="aos-filedrop-sidebar"><div class="aos-filedrop-device-mark"><img src="' + ICON + '" alt=""></div><h2>FileDrop</h2><p>Share through the browser. Nothing to install.</p><div class="aos-filedrop-toggle"><span><b>Enable FileDrop</b><small>Send and receive in this browser</small></span><label class="aos-filedrop-switch"><input type="checkbox" data-fd-enabled><i></i></label></div><div class="aos-filedrop-name"><label for="aos-filedrop-device-name">Device name</label><div><input id="aos-filedrop-device-name" maxlength="80"><button type="button" data-fd-save-name aria-label="Save device name">✓</button></div></div><p class="aos-filedrop-path" data-fd-path></p><div class="aos-filedrop-status" data-fd-status role="status"></div></aside><main class="aos-filedrop-main"></main></div><input type="file" hidden multiple data-fd-upload-input data-aos-allowed-picker="true"><div class="aos-filedrop-resize" aria-hidden="true"></div>';
     document.body.appendChild(windowElement);
     mainElement = windowElement.querySelector(".aos-filedrop-main");
     statusElement = windowElement.querySelector("[data-fd-status]");
@@ -427,32 +467,22 @@
     windowElement.querySelector("[data-fd-close]").addEventListener("click", close);
     windowElement.querySelector("[data-fd-minimize]").addEventListener("click", function () { windowElement.classList.add("aos-filedrop-minimized"); });
     windowElement.querySelector("[data-fd-maximize]").addEventListener("click", function () { windowElement.classList.toggle("aos-filedrop-maximized"); });
+    windowElement.querySelector("[data-fd-upload-input]").addEventListener("change", async function (event) {
+      await importLocalFiles(event.target.files);
+      event.target.value = "";
+    });
     enabledInput.addEventListener("change", async function () {
       var enabled = enabledInput.checked;
       saveBrowserSettings({enabled: enabled});
-      try {
-        state = await request("/api/enable", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({enabled: enabled})});
-        render();
-        setStatus(enabled ? "Ready on your local network" : "FileDrop is off", false);
-      } catch (error) {
-        if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") {
-          state = browserState();
-          render();
-          setStatus(enabled ? "FileDrop is on in browser mode" : "FileDrop is off", false);
-        } else {
-          enabledInput.checked = !enabled;
-          saveBrowserSettings({enabled: !enabled});
-          setStatus(error.message, true);
-        }
-      }
+      state = browserState();
+      render();
+      setStatus(enabled ? "Ready to send and receive in your browser" : "FileDrop is off", false);
     });
     windowElement.querySelector("[data-fd-save-name]").addEventListener("click", async function () {
       saveBrowserSettings({name: nameInput.value});
-      try { state = await request("/api/name", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name: nameInput.value})}); render(); setStatus("Device name saved", false); }
-      catch (error) {
-        if (error && error.code === "FILEDROP_SERVICE_UNAVAILABLE") { state = browserState(); render(); setStatus("Device name saved for browser mode", false); }
-        else setStatus(error.message, true);
-      }
+      state = browserState();
+      render();
+      setStatus("Device name saved for browser FileDrop", false);
     });
   }
 
@@ -470,6 +500,7 @@
   }
 
   function start() {
+    saveBrowserSettings(readBrowserSettings());
     ensureWindow();
     installLauncher();
     var observer = new MutationObserver(installLauncher);
@@ -478,9 +509,12 @@
     window.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && windowElement && !windowElement.hidden) close();
     });
+    if (String(new URLSearchParams(location.search).get("app") || "").toLowerCase() === "filedrop") {
+      window.setTimeout(open, 450);
+    }
   }
 
-  window.AOS_FILEDROP = {open: open, close: close, refresh: refresh};
+  window.AOS_FILEDROP = {open: open, close: close, refresh: refresh, importFiles: importLocalFiles};
   document.documentElement.dataset.aosFileDrop = "ready";
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start, {once: true});
   else start();

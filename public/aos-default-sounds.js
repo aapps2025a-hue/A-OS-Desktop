@@ -8,15 +8,15 @@
   var sounds = [
     {
       id: NOTIFICATION_ID,
-      name: "A-OS 4 Notification.mp4",
-      mime: "audio/mp4",
-      content: "/assets/sounds/aos-4-notification.mp4"
+      name: "A-OS 4 Notification.wav",
+      mime: "audio/wav",
+      content: "/assets/sounds/aos-4-notification.wav"
     },
     {
       id: RINGTONE_ID,
-      name: "A-OS 4 Ringtone.mp4",
-      mime: "audio/mp4",
-      content: "/assets/sounds/aos-4-ringtone.mp4"
+      name: "A-OS 4 Ringtone.wav",
+      mime: "audio/wav",
+      content: "/assets/sounds/aos-4-ringtone.wav"
     }
   ];
 

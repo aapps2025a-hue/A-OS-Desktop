@@ -15,8 +15,18 @@
 
 .desktop .shelf > i { display: none !important; }
 
-.desktop .shelf > [data-aos-taskbar-drag="ready"] { cursor: grab; }
+.desktop .shelf > [data-aos-taskbar-drag="ready"] { cursor: grab; user-select: none; -webkit-user-drag: none; }
 .desktop .shelf > [data-aos-taskbar-drag="ready"]:active { cursor: grabbing; }
+.desktop .shelf > .search-pill[data-aos-taskbar-drag="ready"] { position: relative; }
+.desktop .shelf > .search-pill[data-aos-taskbar-drag="ready"]::after {
+  content: "";
+  width: 10px;
+  align-self: stretch;
+  flex: none;
+  border-left: 1px dotted #6e8a99;
+  opacity: .62;
+}
+.desktop .shelf > .aos-taskbar-pointer-dragging { z-index: 20; cursor: grabbing !important; transform: scale(.97); }
 
 .desktop .shelf .launcher-button,
 .desktop .shelf .shelf-icon,

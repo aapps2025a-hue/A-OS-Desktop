@@ -491,6 +491,81 @@ def controls_scene(t, duration):
     return camera_frame(base, 1.075, (920, 365))
 
 
+def personalise_scene(t, duration):
+    base = background("Aqua A (No A).png", 10).copy()
+    taskbar(base, active=("Web", "Files"), t=1)
+    scene_label(base, "Your taskbar", "Move Search. Move everything.", clamp(t / 0.55))
+    draw = ImageDraw.Draw(base, "RGBA")
+    panel = window_frame(base, (74, 150, 594, 596), "Appearance", "Settings.png", "#4f7cff")
+    x1, y1, x2, y2 = panel
+    draw.text((x1 + 16, y1 + 8), "Mouse pointer", font=F24B, fill="#18313d")
+    draw.text((x1 + 16, y1 + 44), "Upload your own pointer", font=F14, fill="#607985")
+    rounded_panel(draw, (x1 + 16, y1 + 78, x2 - 16, y1 + 166), 8, (239, 247, 250, 255), (194, 211, 220, 255))
+    draw_cursor(base, x1 + 46, y1 + 101)
+    draw.text((x1 + 92, y1 + 92), "Custom pointer", font=F16B, fill="#1c3540")
+    draw.text((x1 + 92, y1 + 121), "PNG, WebP, JPG, GIF or SVG", font=F12, fill="#6a818d")
+    draw.rounded_rectangle((x2 - 142, y1 + 100, x2 - 34, y1 + 140), radius=7, fill="#1688bf")
+    draw.text((x2 - 88, y1 + 111), "Upload", font=F14, fill="white", anchor="ma")
+    draw.text((x1 + 16, y1 + 205), "Pointer size", font=F14, fill="#35515d")
+    draw.rounded_rectangle((x1 + 16, y1 + 242, x2 - 24, y1 + 252), radius=5, fill="#cad9df")
+    slider = lerp(x1 + 112, x2 - 96, smooth((t - 1.1) / 1.4))
+    draw.rounded_rectangle((x1 + 16, y1 + 242, slider, y1 + 252), radius=5, fill="#1ab3dc")
+    draw.ellipse((slider - 9, y1 + 234, slider + 9, y1 + 260), fill="white", outline="#1ab3dc", width=2)
+
+    drag = smooth((t - 1.55) / 2.0)
+    search_x = lerp(86, 766, drag)
+    taskbar_y = 655
+    draw.rounded_rectangle((search_x, taskbar_y, search_x + 216, taskbar_y + 42), radius=20, fill=(255, 255, 255, 232), outline="#a9c4d0", width=1)
+    draw.text((search_x + 25, taskbar_y + 11), "Search your device", font=F14, fill="#526a75")
+    draw.rounded_rectangle((search_x + 204, taskbar_y + 9, search_x + 207, taskbar_y + 33), radius=1, fill="#829ba6")
+    cursor_x = search_x + 205
+    cursor_y = taskbar_y + 20
+    draw_cursor(base, cursor_x, cursor_y, clamp(1 - abs(t - 1.55) / 0.22))
+    if drag > 0.7:
+        toast(base, "Taskbar saved", "Search moved to your chosen position", "Tick.png", clamp((t - 3.1) / 0.5), 140)
+    return camera_frame(base, 1.04, (690, 390))
+
+
+def filedrop_scene(t, duration):
+    base = background("Porto.png", 20).copy()
+    taskbar(base, active=("Files",), t=1)
+    scene_label(base, "FileDrop", "Click. Upload. Receive.", clamp(t / 0.55))
+    content = window_frame(base, (126, 138, 1154, 620), "FileDrop", "Files.png", "#315efb")
+    x1, y1, x2, y2 = content
+    draw = ImageDraw.Draw(base, "RGBA")
+    draw.rounded_rectangle((x1, y1, x1 + 246, y2), radius=8, fill="#eaf1f8")
+    put_icon(base, "Files.png", x1 + 22, y1 + 22, 58)
+    draw.text((x1 + 96, y1 + 26), "FileDrop", font=F20B, fill="#18313d")
+    draw.text((x1 + 96, y1 + 55), "No app needed", font=F12, fill="#607985")
+    draw.rounded_rectangle((x1 + 20, y1 + 112, x1 + 226, y1 + 160), radius=8, fill="#315efb")
+    draw.text((x1 + 123, y1 + 126), "Upload from this device", font=F14, fill="white", anchor="ma")
+    draw.text((x1 + 20, y1 + 198), "Receiving", font=F14, fill="#49616d")
+    draw.rounded_rectangle((x1 + 20, y1 + 230, x1 + 226, y1 + 294), radius=8, fill="#ddf6e8", outline="#a7d5bd")
+    draw.ellipse((x1 + 36, y1 + 247, x1 + 66, y1 + 277), fill="#21b47b")
+    draw.text((x1 + 82, y1 + 244), "Ready", font=F16B, fill="#17613e")
+    draw.text((x1 + 82, y1 + 268), "Browser is listening", font=F12, fill="#577467")
+
+    draw.text((x1 + 278, y1 + 10), "Choose a device", font=F24B, fill="#18313d")
+    devices = [("Windows PC", "Windows · Browser", "This PC.png"), ("MacBook", "macOS · Browser", "PC.png")]
+    for index, (name, detail, icon) in enumerate(devices):
+        y = y1 + 62 + index * 92
+        active = index == 1 and t > 1.8
+        draw.rounded_rectangle((x1 + 278, y, x2 - 24, y + 74), radius=8, fill="#e8f0ff" if active else "#f4f7f9", outline="#315efb" if active else "#c8d7df", width=2 if active else 1)
+        put_icon(base, icon, x1 + 294, y + 13, 48)
+        draw.text((x1 + 360, y + 15), name, font=F16B, fill="#1d3642")
+        draw.text((x1 + 360, y + 42), detail, font=F12, fill="#6b818c")
+        draw.text((x2 - 54, y + 28), "Send", font=F14, fill="#315efb", anchor="ra")
+    progress = smooth((t - 2.15) / 1.7)
+    draw.text((x1 + 278, y1 + 278), "A-OS-Preview.mp4", font=F16B, fill="#1d3642")
+    draw.text((x2 - 24, y1 + 281), f"{round(progress * 100)}%", font=F14, fill="#607985", anchor="ra")
+    draw.rounded_rectangle((x1 + 278, y1 + 320, x2 - 24, y1 + 334), radius=7, fill="#d6e2e8")
+    draw.rounded_rectangle((x1 + 278, y1 + 320, lerp(x1 + 278, x2 - 24, progress), y1 + 334), radius=7, fill="#315efb")
+    if progress > 0.98:
+        draw.text((x1 + 278, y1 + 358), "Received in Downloads", font=F16B, fill="#1c9b68")
+    draw_cursor(base, lerp(x1 + 122, x2 - 80, smooth(t / 1.8)), lerp(y1 + 136, y1 + 100, smooth(t / 1.8)), clamp(1 - abs(t - 1.8) / 0.22))
+    return camera_frame(base, 1.045, (W / 2, 380))
+
+
 def family_scene(t, duration):
     base = background("Family Home.png").copy()
     taskbar(base, active=("Paint",), t=clamp(t / 0.5), vertical=True)
@@ -578,10 +653,10 @@ def finish_scene(t, duration):
         p = ease_out(clamp((t - 2.15) / 0.76))
         size = round(lerp(220, 132, p))
         rounded_icon(base, "OS Logo.png", (W - size) / 2, 114 + (220 - size) / 2, size, max(26, size // 5), p)
-        draw.text((W / 2, 342), "A-OS Desktop 3.5", font=F64, fill=(255, 255, 255, alpha(p)), anchor="ma")
+        draw.text((W / 2, 342), "A-OS Desktop 4.0", font=F64, fill=(255, 255, 255, alpha(p)), anchor="ma")
         draw.text((W / 2, 430), "A real desktop. Built your way.", font=F24, fill=(171, 205, 218, alpha(p)), anchor="ma")
         rounded_panel(draw, (414, 508, 866, 574), 29, (42, 180, 221, alpha(p)), (108, 224, 249, alpha(p)))
-        draw.text((W / 2, 528), "a-os-desktop.web.app", font=F20B, fill=(255, 255, 255, alpha(p)), anchor="ma")
+        draw.text((W / 2, 528), "A-OS Desktop · Open source", font=F20B, fill=(255, 255, 255, alpha(p)), anchor="ma")
     return base
 
 
@@ -592,6 +667,8 @@ SCENES = [
     (4.9, multitask_scene),
     (4.9, store_scene),
     (1.45, chapter_scene("Designed around you.", "Real controls. Personal spaces. No compromises.", "#7b74ff", "Settings.png")),
+    (4.7, personalise_scene),
+    (4.7, filedrop_scene),
     (4.6, controls_scene),
     (4.8, family_scene),
     (4.8, update_scene),
