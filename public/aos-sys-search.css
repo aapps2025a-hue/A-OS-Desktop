@@ -323,6 +323,39 @@
   font-size: 11px;
 }
 
+.aos-system-menu {
+  position: fixed;
+  z-index: 2147481910;
+  display: grid;
+  min-width: 184px;
+  padding: 6px;
+  border: 1px solid rgba(104, 132, 151, 0.32);
+  border-radius: 7px;
+  color: #183046;
+  background: rgba(250, 253, 255, 0.98);
+  box-shadow: 0 18px 48px rgba(14, 35, 52, 0.28);
+  backdrop-filter: blur(20px) saturate(1.12);
+}
+
+.aos-system-menu[hidden] {
+  display: none !important;
+}
+
+.aos-system-menu > button {
+  width: 100%;
+  height: 32px;
+  justify-content: flex-start;
+  padding: 0 10px;
+  border-radius: 5px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.aos-system-menu > button[data-status-command^="exit"],
+.aos-system-menu > button[data-status-command="shutdown"] {
+  color: #b22f3f;
+}
+
 .aos-status-bar-visible .aos-sys-search {
   max-height: min(650px, calc(100dvh - 144px));
 }
@@ -345,7 +378,8 @@
 }
 
 .dark-mode .aos-sys-search,
-.dark-mode .aos-system-statusbar {
+.dark-mode .aos-system-statusbar,
+.dark-mode .aos-system-menu {
   color: #edf7fc;
   border-color: #ffffff1c;
   background: rgba(13, 27, 39, 0.95);
@@ -371,6 +405,11 @@
 .dark-mode .aos-system-statusbar button:hover,
 .dark-mode .aos-system-statusbar button:focus-visible {
   background: #203c50;
+}
+
+.dark-mode .aos-system-menu > button[data-status-command^="exit"],
+.dark-mode .aos-system-menu > button[data-status-command="shutdown"] {
+  color: #ff9aa7;
 }
 
 .dark-mode .aos-sys-search-wikipedia {

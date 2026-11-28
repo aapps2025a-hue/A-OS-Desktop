@@ -193,6 +193,11 @@
 .aos-taskbar-dragging { opacity: .45 !important; filter: saturate(.55); }
 .aos-taskbar-drop-target { outline: 2px solid #22a5e5 !important; outline-offset: 2px; }
 
+.aos-taskbar-anchored-overlay {
+  z-index: 2147481800 !important;
+  margin: 0 !important;
+}
+
 .aos-taskbar-desktop-shortcut {
   z-index: 5;
   position: fixed;

@@ -301,6 +301,68 @@ async function main() {
       const soundFiles = JSON.parse(localStorage.getItem('aos-files') || '[]');
       const soundResponses = await Promise.all(['/assets/sounds/aos-4-notification.wav', '/assets/sounds/aos-4-ringtone.wav'].map((url) => fetch(url)));
       const customPointerControl = document.querySelector('.aos-custom-pointer-setting');
+      localStorage.setItem('aos-show-system-status-bar', 'true');
+      document.querySelector('.desktop').classList.add('aos-status-bar-visible');
+      const menuText = (name) => {
+        const trigger = document.querySelector('[data-status-action="' + name + '"]');
+        trigger.click();
+        return [...document.querySelector('[data-status-menu="' + name + '"]').querySelectorAll('[role="menuitem"]')].map((item) => item.textContent.trim());
+      };
+      const openBoxMenu = menuText('openbox');
+      const fileMenu = menuText('files');
+      const editMenu = menuText('edit');
+      document.body.click();
+      document.querySelector('[data-status-action="openbox"]').click();
+      document.querySelector('[data-status-command="open-terminal"]').click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const terminalOpened = ${appButton("Terminal")}.classList.contains('state-open');
+      document.querySelector('[data-status-action="files"]').click();
+      document.querySelector('[data-status-command="open-files"]').click();
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const filesOpened = ${appButton("Files")}.classList.contains('state-open');
+      document.querySelector('[data-status-action="edit"]').click();
+      document.querySelector('[data-status-command="hide-status-bar"]').click();
+      const statusBarHidden = !document.querySelector('.desktop').classList.contains('aos-status-bar-visible');
+      localStorage.setItem('aos-show-system-status-bar', 'true');
+      document.querySelector('.desktop').classList.add('aos-status-bar-visible');
+
+      const isAbove = (overlay, anchor) => {
+        if (!overlay || !anchor) return false;
+        const panel = overlay.getBoundingClientRect();
+        const control = anchor.getBoundingClientRect();
+        const centre = control.left + control.width / 2;
+        return panel.bottom <= control.top - 4 && panel.left <= centre && panel.right >= centre;
+      };
+      const overlaySnapshot = (overlay, anchor, ok) => overlay ? {
+        panel: Object.fromEntries(['left','top','right','bottom'].map((key) => [key, Math.round(overlay.getBoundingClientRect()[key])])),
+        anchor: Object.fromEntries(['left','top','right','bottom'].map((key) => [key, Math.round(anchor.getBoundingClientRect()[key])])),
+        key: overlay.dataset.aosTaskbarAnchor,
+        ok
+      } : null;
+      search.click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      api.positionOverlays();
+      const searchPanel = document.querySelector('.aos-sys-search:not([hidden])');
+      const searchAbove = isAbove(searchPanel, search) && searchPanel.dataset.aosTaskbarAnchor === 'control:search';
+      const searchDetail = overlaySnapshot(searchPanel, search, searchAbove);
+      searchPanel.querySelector('[data-sys-search-close]').click();
+
+      status.click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      api.positionOverlays();
+      const quickPanel = document.querySelector('.quick');
+      const quickAbove = isAbove(quickPanel, status) && quickPanel.dataset.aosTaskbarAnchor === 'control:status';
+      const quickDetail = overlaySnapshot(quickPanel, status, quickAbove);
+      status.click();
+
+      const ai = shelf.querySelector('[aria-label="AI shortcut"]');
+      ai.click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      api.positionOverlays();
+      const aiPanel = document.querySelector('.sparkle-embed');
+      const aiAbove = isAbove(aiPanel, ai) && aiPanel.dataset.aosTaskbarAnchor === 'control:ai';
+      const aiDetail = overlaySnapshot(aiPanel, ai, aiAbove);
+      if (aiPanel) aiPanel.querySelector(':scope > button').click();
       return {
         referenceHidden: !document.querySelector('.aos-taskbar-reference'),
         layout: document.querySelector('.desktop').classList.contains('aos-taskbar-layout-floating-segmented'),
@@ -317,6 +379,14 @@ async function main() {
         widgets: widgetSafe,
         status: Boolean(document.querySelector('.status.aos-status-modern .aos-status-date')),
         handle: Boolean(document.querySelector('.aos-taskbar-resize-handle')),
+        overlays: searchAbove && quickAbove && aiAbove,
+        overlayDetail: {
+          search: searchDetail,
+          quick: quickDetail,
+          ai: aiDetail
+        },
+        statusMenus: JSON.stringify(openBoxMenu) === JSON.stringify(['Files', 'Terminal', 'Exit A-OS', 'Exit OpenBox']) && JSON.stringify(fileMenu) === JSON.stringify(['Files', 'New Folder', 'New File', 'A-OS Folder', 'Root', 'Reload']) && JSON.stringify(editMenu) === JSON.stringify(['Settings', 'Change Background', 'Hide Status Bar', 'Lock']),
+        statusMenuActions: terminalOpened && filesOpened && statusBarHidden,
         sounds: localStorage.getItem('aos-notification-tone') === 'file:aos-4-default-notification' && localStorage.getItem('aos-ringtone-tone') === 'file:aos-4-default-ringtone' && soundFiles.some((file) => file.id === 'aos-4-default-notification' && file.parent === 'os-root' && file.mime === 'audio/wav' && /\.wav$/i.test(file.name)) && soundFiles.some((file) => file.id === 'aos-4-default-ringtone' && file.parent === 'os-root' && file.mime === 'audio/wav' && /\.wav$/i.test(file.name)) && soundResponses.every((response) => response.ok),
         widgetDetail: widgetSafe ? null : {
           widgets: widgets.map((rect) => ({left:rect.left,top:rect.top,right:rect.right,bottom:rect.bottom})),
@@ -331,13 +401,13 @@ async function main() {
         }
       };
     })()`);
-    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "pointerSort", "customPointer", "shortcut", "file", "pins", "widgets", "status", "handle", "sounds"];
+    const taskbarChecks = ["referenceHidden", "layout", "size", "reorder", "draggable", "controlReorder", "controlsDraggable", "pointerSort", "customPointer", "shortcut", "file", "pins", "widgets", "status", "handle", "overlays", "statusMenus", "statusMenuActions", "sounds"];
     if (taskbarChecks.some((key) => taskbarResult[key] !== true)) {
       throw new Error(`Taskbar studio regression: ${JSON.stringify(taskbarResult)}`);
     }
     await evaluate(`${appButton("OSInternet")}.click()`);
     await waitFor(`Boolean(document.querySelector('.browser-bookmarks .aos-app-browser-pin'))`, "the app pin inside OSInternet");
-    console.log("PASS: A-OS 4.0 taskbar controls, sounds, resizing, desktop/Files/browser drops and widget collision avoidance");
+    console.log("PASS: A-OS 4.0 taskbar controls, anchored overlays, OpenBox menus, sounds, resizing, desktop/Files/browser drops and widget collision avoidance");
     cdp.socket.close();
     return;
   }

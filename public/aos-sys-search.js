@@ -10,6 +10,43 @@
   var wikipediaTimer = 0;
   var wikipediaController = null;
   var statusTimer = 0;
+  var statusMenuRoot = null;
+
+  var STATUS_MENUS = {
+    openbox: [
+      ["Files", "open-files"],
+      ["Terminal", "open-terminal"],
+      ["Exit A-OS", "exit-aos"],
+      ["Exit OpenBox", "exit-openbox"]
+    ],
+    files: [
+      ["Files", "open-files"],
+      ["New Folder", "new-folder"],
+      ["New File", "new-file"],
+      ["A-OS Folder", "aos-folder"],
+      ["Root", "root-folder"],
+      ["Reload", "reload"]
+    ],
+    edit: [
+      ["Settings", "open-settings"],
+      ["Change Background", "change-background"],
+      ["Hide Status Bar", "hide-status-bar"],
+      ["Lock", "lock"]
+    ],
+    apps: [
+      ["All Apps", "all-apps"],
+      ["OSInternet", "open-browser"],
+      ["A-Store", "open-store"],
+      ["A-AI", "open-ai"],
+      ["FileDrop", "open-filedrop"],
+      ["Settings", "open-settings"]
+    ],
+    exit: [
+      ["Lock", "lock"],
+      ["Restart", "restart"],
+      ["Shut Down", "shutdown"]
+    ]
+  };
 
   function asset(name) {
     return new URL("./assets/icons/" + name, document.baseURI).href;
@@ -237,6 +274,160 @@
     return new Intl.DateTimeFormat(undefined, {weekday: "short", hour: "2-digit", minute: "2-digit"}).format(new Date());
   }
 
+  function notify(message) {
+    window.dispatchEvent(new CustomEvent("aos-notification", {detail: {message: message}}));
+  }
+
+  function visible(element) {
+    if (!element) return false;
+    var rect = element.getBoundingClientRect();
+    var style = window.getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function appWindow(name) {
+    return Array.from(document.querySelectorAll(".system-window")).find(function (windowElement) {
+      if (!visible(windowElement)) return false;
+      var title = windowElement.querySelector(":scope > header b, :scope > header strong, :scope > header [class*='title']");
+      return title && normalize(title.textContent) === normalize(name);
+    });
+  }
+
+  function clickNamedButton(root, names) {
+    if (!root) return false;
+    var wanted = names.map(normalize);
+    var button = Array.from(root.querySelectorAll("button, [role='button']")).find(function (candidate) {
+      var label = normalize(candidate.getAttribute("aria-label") || candidate.textContent);
+      return visible(candidate) && wanted.indexOf(label) !== -1;
+    });
+    if (!button) return false;
+    button.click();
+    return true;
+  }
+
+  function withApp(name, callback) {
+    openApp(name);
+    window.setTimeout(function () {
+      var root = appWindow(name);
+      if (!root || callback(root) === false) notify(name + " is open, but that command is not available here.");
+    }, 180);
+  }
+
+  function openPowerAction(label) {
+    function activate() {
+      var quick = Array.from(document.querySelectorAll(".quick")).find(visible);
+      if (quick && clickNamedButton(quick, [label])) return;
+      notify(label + " is not available on this device.");
+    }
+    var quick = Array.from(document.querySelectorAll(".quick")).find(visible);
+    if (quick) {
+      activate();
+      return;
+    }
+    var status = Array.from(document.querySelectorAll(".shelf > .status")).find(visible);
+    if (!status) {
+      notify("Quick Settings is not available.");
+      return;
+    }
+    status.click();
+    window.setTimeout(activate, 120);
+  }
+
+  function closeStatusMenus() {
+    document.querySelectorAll(".aos-system-statusbar [data-status-action]").forEach(function (button) {
+      button.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll(".aos-system-menu").forEach(function (menu) { menu.hidden = true; });
+    statusMenuRoot = null;
+  }
+
+  function positionStatusMenu(menu, button) {
+    var rect = button.getBoundingClientRect();
+    menu.style.left = Math.max(6, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 6)) + "px";
+    menu.style.top = Math.round(rect.bottom + 4) + "px";
+  }
+
+  function toggleStatusMenu(bar, button) {
+    var menu = bar.querySelector('[data-status-menu="' + button.dataset.statusAction + '"]');
+    if (!menu) return;
+    var opening = menu.hidden;
+    closeStatusMenus();
+    if (!opening) return;
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    statusMenuRoot = menu;
+    positionStatusMenu(menu, button);
+    var first = menu.querySelector("button");
+    if (first) first.focus({preventScroll: true});
+  }
+
+  function runStatusCommand(command) {
+    closeStatusMenus();
+    if (command === "open-files") return openApp("Files");
+    if (command === "open-terminal") return openApp("Terminal");
+    if (command === "open-settings") return openApp("Settings");
+    if (command === "open-browser") return openApp("OSInternet");
+    if (command === "open-store") return openApp("A-Store");
+    if (command === "open-filedrop") return openApp("FileDrop");
+    if (command === "open-ai") {
+      var ai = document.querySelector('.shelf [aria-label="AI shortcut"]');
+      if (ai) ai.click();
+      else notify("A-AI is not available.");
+      return;
+    }
+    if (command === "all-apps") {
+      var launcher = document.querySelector(".launcher-button");
+      if (launcher) launcher.click();
+      return;
+    }
+    if (command === "new-folder") return withApp("Files", function (root) { return clickNamedButton(root, ["New Folder", "New folder"]); });
+    if (command === "new-file") return withApp("Files", function (root) { return clickNamedButton(root, ["New File", "New file"]); });
+    if (command === "aos-folder") return withApp("Files", function (root) {
+      window.dispatchEvent(new CustomEvent("aos-files-navigate", {detail: {path: "home"}}));
+      return clickNamedButton(root, ["Home", "A-OS", "A-OS Folder", "A-OS Files"]);
+    });
+    if (command === "root-folder") return withApp("Files", function (root) {
+      window.dispatchEvent(new CustomEvent("aos-files-navigate", {detail: {path: "root"}}));
+      return clickNamedButton(root, ["OS", "Root"]);
+    });
+    if (command === "change-background") return withApp("Settings", function (root) {
+      return clickNamedButton(root, ["Appearance", "Background", "Change Background", "Personalisation", "Personalization"]);
+    });
+    if (command === "hide-status-bar" || command === "exit-openbox") {
+      toggleStatusBar();
+      notify(command === "exit-openbox" ? "OpenBox status bar closed. Right-click the desktop to show it again." : "Status bar hidden. Right-click the desktop to show it again.");
+      return;
+    }
+    if (command === "exit-aos" || command === "lock") return openPowerAction("Lock");
+    if (command === "restart") return openPowerAction("Restart");
+    if (command === "shutdown") return openPowerAction("Shut down");
+    if (command === "reload") window.location.reload();
+  }
+
+  function createStatusMenus(bar) {
+    Object.keys(STATUS_MENUS).forEach(function (name) {
+      var trigger = bar.querySelector('[data-status-action="' + name + '"]');
+      if (!trigger) return;
+      trigger.setAttribute("aria-haspopup", "menu");
+      trigger.setAttribute("aria-expanded", "false");
+      var menu = document.createElement("div");
+      menu.className = "aos-system-menu";
+      menu.dataset.statusMenu = name;
+      menu.setAttribute("role", "menu");
+      menu.setAttribute("aria-label", trigger.textContent.trim() + " menu");
+      menu.hidden = true;
+      STATUS_MENUS[name].forEach(function (item) {
+        var option = document.createElement("button");
+        option.type = "button";
+        option.setAttribute("role", "menuitem");
+        option.dataset.statusCommand = item[1];
+        option.textContent = item[0];
+        menu.appendChild(option);
+      });
+      bar.appendChild(menu);
+    });
+  }
+
   function createStatusBar(desktop) {
     var existing = desktop.querySelector(".aos-system-statusbar");
     if (existing) return existing;
@@ -244,23 +435,18 @@
     bar.className = "aos-system-statusbar";
     bar.setAttribute("aria-label", "A-OS system status bar");
     bar.innerHTML = '<img src="' + asset("OS Logo.png") + '" alt="A-OS"><button type="button" data-status-action="openbox">OpenBox</button><button type="button" data-status-action="files">File</button><button type="button" data-status-action="edit">Edit</button><button type="button" data-status-action="apps">Apps</button><button type="button" data-status-action="exit">Exit</button><span class="aos-system-statusbar-spacer"></span><span class="aos-system-statusbar-output"><span data-status-network>Online</span><time></time></span>';
+    createStatusMenus(bar);
     bar.addEventListener("click", function (event) {
+      var command = event.target.closest("[data-status-command]");
+      if (command) {
+        event.stopPropagation();
+        runStatusCommand(command.dataset.statusCommand);
+        return;
+      }
       var action = event.target.closest("[data-status-action]");
       if (!action) return;
-      if (action.dataset.statusAction === "files") openApp("Files");
-      if (action.dataset.statusAction === "apps") {
-        var launcher = document.querySelector(".launcher-button");
-        if (launcher) launcher.click();
-      }
-      if (action.dataset.statusAction === "openbox") {
-        var terminal = document.querySelector('.shelf [aria-label="Terminal"]');
-        if (terminal) terminal.click();
-      }
-      if (action.dataset.statusAction === "edit") showSearch();
-      if (action.dataset.statusAction === "exit") {
-        var account = document.querySelector('.shelf [aria-label$="Account"]');
-        if (account) account.click();
-      }
+      event.stopPropagation();
+      toggleStatusMenu(bar, action);
     });
     desktop.appendChild(bar);
     return bar;
@@ -325,6 +511,7 @@
   }
 
   document.addEventListener("click", function (event) {
+    if (statusMenuRoot && !event.target.closest(".aos-system-statusbar")) closeStatusMenus();
     var searchButton = event.target.closest && event.target.closest(".search-pill");
     if (searchButton) {
       event.preventDefault();
@@ -342,6 +529,14 @@
       else showSearch();
     }
     if (event.key === "Escape" && searchRoot && !searchRoot.hidden) hideSearch();
+    if (event.key === "Escape" && statusMenuRoot) closeStatusMenus();
+  });
+
+  window.addEventListener("resize", function () {
+    if (!statusMenuRoot) return;
+    var name = statusMenuRoot.dataset.statusMenu;
+    var button = document.querySelector('.aos-system-statusbar [data-status-action="' + name + '"]');
+    if (button) positionStatusMenu(statusMenuRoot, button);
   });
 
   window.addEventListener("online", applyStatusBar);

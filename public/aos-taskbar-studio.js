@@ -22,6 +22,8 @@
   var scheduled = false;
   var resolvingWidgets = false;
   var statusTimer = 0;
+  var lastOverlayAnchor = null;
+  var lastOverlayAnchorTime = 0;
 
   function readJson(key, fallback) {
     try {
@@ -64,9 +66,9 @@
     if (item.matches(".launcher-button")) return "control:launcher";
     if (item.matches(".search-pill")) return "control:search";
     if (item.matches(".status")) return "control:status";
+    if (item.matches('[aria-label="AI shortcut"]')) return "control:ai";
     if (item.matches(".shelf-emoji")) return "control:quick";
     if (item.matches(".aos-device-status-corner")) return "control:device-status";
-    if (item.matches('[aria-label="AI shortcut"]')) return "control:ai";
     return "";
   }
 
@@ -527,6 +529,75 @@
     }
   }
 
+  function visible(element) {
+    if (!element) return false;
+    var bounds = element.getBoundingClientRect();
+    var style = window.getComputedStyle(element);
+    return bounds.width > 0 && bounds.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  }
+
+  function defaultOverlayAnchor(overlay, shelf) {
+    if (overlay.matches(".aos-sys-search")) return shelf.querySelector(":scope > .search-pill");
+    if (overlay.matches(".sparkle-embed")) return shelf.querySelector(':scope > [aria-label="AI shortcut"]');
+    if (overlay.matches(".quick")) return shelf.querySelector(":scope > .status");
+    return null;
+  }
+
+  function overlayAnchor(overlay, shelf) {
+    if (lastOverlayAnchor && lastOverlayAnchor.isConnected && lastOverlayAnchor.closest(".shelf") === shelf && Date.now() - lastOverlayAnchorTime < 900) {
+      var key = shelfItemKey(lastOverlayAnchor);
+      if (overlay.matches(".quick") && ["control:status", "control:ai", "control:quick"].indexOf(key) !== -1) return lastOverlayAnchor;
+      if (overlay.matches(".sparkle-embed") && key === "control:ai") return lastOverlayAnchor;
+      if (overlay.matches(".aos-sys-search") && key === "control:search") return lastOverlayAnchor;
+    }
+    return defaultOverlayAnchor(overlay, shelf);
+  }
+
+  function positionTaskbarOverlay(overlay) {
+    if (!visible(overlay)) return;
+    var desktop = overlay.closest(".desktop") || document.querySelector(".desktop");
+    var shelf = desktop && desktop.querySelector(":scope > .shelf");
+    var anchor = shelf && overlayAnchor(overlay, shelf);
+    if (!desktop || !shelf || !visible(anchor)) return;
+    var anchorRect = anchor.getBoundingClientRect();
+    var gap = 10;
+    var margin = 8;
+    var statusBar = document.querySelector(".aos-status-bar-visible .aos-system-statusbar");
+    var minimumTop = statusBar && visible(statusBar) ? statusBar.getBoundingClientRect().bottom + 6 : margin;
+    var position = desktop.classList.contains("shelf-top") ? "top" : desktop.classList.contains("shelf-left") ? "left" : desktop.classList.contains("shelf-right") ? "right" : "bottom";
+
+    overlay.classList.add("aos-taskbar-anchored-overlay");
+    overlay.style.position = "fixed";
+    overlay.style.right = "auto";
+    overlay.style.bottom = "auto";
+    overlay.style.maxHeight = position === "bottom" ? Math.max(240, anchorRect.top - minimumTop - gap) + "px" : Math.max(240, window.innerHeight - minimumTop - margin) + "px";
+
+    var width = overlay.offsetWidth;
+    var height = overlay.offsetHeight;
+    var left;
+    var top;
+    if (position === "top") {
+      left = anchorRect.left + anchorRect.width / 2 - width / 2;
+      top = anchorRect.bottom + gap;
+    } else if (position === "left") {
+      left = anchorRect.right + gap;
+      top = anchorRect.top + anchorRect.height / 2 - height / 2;
+    } else if (position === "right") {
+      left = anchorRect.left - width - gap;
+      top = anchorRect.top + anchorRect.height / 2 - height / 2;
+    } else {
+      left = anchorRect.left + anchorRect.width / 2 - width / 2;
+      top = anchorRect.top - height - gap;
+    }
+    overlay.style.left = Math.round(clamp(left, margin, Math.max(margin, window.innerWidth - width - margin))) + "px";
+    overlay.style.top = Math.round(clamp(top, minimumTop, Math.max(minimumTop, window.innerHeight - height - margin))) + "px";
+    overlay.dataset.aosTaskbarAnchor = shelfItemKey(anchor);
+  }
+
+  function positionTaskbarOverlays() {
+    document.querySelectorAll(".aos-sys-search, .quick, .sparkle-embed").forEach(positionTaskbarOverlay);
+  }
+
   function installResizeHandle(desktop, shelf) {
     var handle = shelf.querySelector(":scope > .aos-taskbar-resize-handle");
     if (handle) return;
@@ -739,6 +810,7 @@
     addSettingsControls();
     enhanceBrowserPins();
     bindWidgetLayer();
+    positionTaskbarOverlays();
   }
 
   function scheduleEnhance() {
@@ -751,8 +823,16 @@
   }
 
   document.addEventListener("dblclick", openAosLink, true);
+  document.addEventListener("click", function (event) {
+    var control = event.target.closest && event.target.closest(".shelf > .search-pill, .shelf > .status, .shelf > [aria-label='AI shortcut'], .shelf > .shelf-bird");
+    if (!control) return;
+    lastOverlayAnchor = control;
+    lastOverlayAnchorTime = Date.now();
+    window.requestAnimationFrame(positionTaskbarOverlays);
+    window.setTimeout(positionTaskbarOverlays, 80);
+  }, true);
   new MutationObserver(scheduleEnhance).observe(document.documentElement, {childList: true, subtree: true});
-  window.addEventListener("resize", function () { applyPreferences(); resolveWidgets(); });
+  window.addEventListener("resize", function () { applyPreferences(); resolveWidgets(); positionTaskbarOverlays(); });
   window.addEventListener("storage", function (event) {
     if ([LAYOUT_KEY, SIZE_KEY, ORDER_KEY, SHORTCUTS_KEY, BROWSER_PINS_KEY].indexOf(event.key) !== -1) scheduleEnhance();
   });
@@ -768,7 +848,8 @@
     createDesktopShortcut: createDesktopShortcut,
     addShortcutFile: addShortcutFile,
     addBrowserPin: addBrowserPin,
-    resolveWidgets: resolveWidgets
+    resolveWidgets: resolveWidgets,
+    positionOverlays: positionTaskbarOverlays
   };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", enhance, {once: true});
