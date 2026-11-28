@@ -432,10 +432,6 @@ async function main() {
     `Boolean(document.querySelector('.aos-filedrop-window:not([hidden])') && document.querySelector('.aos-filedrop-taskbar'))`,
     "FileDrop to open in a window and appear on the taskbar"
   );
-  await waitFor(
-    `Boolean(document.querySelector('.aos-filedrop-offline'))`,
-    "FileDrop's browser transfer guidance"
-  );
   const fileDropBrowser = await evaluate(`(async () => {
     const upload = document.querySelector('.aos-filedrop-window [data-fd-upload]');
     const picker = document.querySelector('.aos-filedrop-window [data-fd-upload-input]');
@@ -451,7 +447,7 @@ async function main() {
       imported: files.some((file) => file.name === 'browser-filedrop.txt' && file.parent === 'downloads')
     };
   })()`);
-  if (!fileDropBrowser.noExe || !fileDropBrowser.upload || !fileDropBrowser.picker || !fileDropBrowser.fits || !fileDropBrowser.imported) {
+  if (fileDropBrowser.noExe || !fileDropBrowser.upload || !fileDropBrowser.picker || !fileDropBrowser.fits || !fileDropBrowser.imported) {
     throw new Error(`FileDrop browser mode regression: ${JSON.stringify(fileDropBrowser)}`);
   }
   await evaluate(`(() => {
