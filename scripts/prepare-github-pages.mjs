@@ -4,6 +4,7 @@ import {fileURLToPath} from "node:url";
 
 const source = new URL("../public/", import.meta.url);
 const output = new URL("../_site/", import.meta.url);
+const sourceVersion = JSON.parse(readFileSync(new URL("version.json", source), "utf8"));
 
 rmSync(output, {recursive: true, force: true});
 mkdirSync(output, {recursive: true});
@@ -31,7 +32,7 @@ walk(fileURLToPath(output));
 writeFileSync(
   new URL("version.json", output),
   JSON.stringify({
-    version: "3.5.0",
+    version: String(sourceVersion.version || "4.0.0"),
     build: new Date().toISOString(),
     revision: process.env.GITHUB_SHA || "github-pages"
   }, null, 2) + "\n"
