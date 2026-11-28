@@ -9,6 +9,9 @@
   var SHORTCUTS_KEY = "aos-taskbar-desktop-shortcuts";
   var BROWSER_PINS_KEY = "aos-taskbar-browser-pins";
   var WIDGET_POSITIONS_KEY = "aos-widget-safe-positions";
+  var QUICK_ORDER_KEY = "aos-quick-settings-order";
+  var QUICK_FILE_PINS_KEY = "aos-quick-settings-file-pins";
+  var FILES_LAST_LOCATION_KEY = "aos-files-last-location";
   var LAYOUT_CLASS_PREFIX = "aos-taskbar-layout-";
   var LAYOUTS = [
     {id: "floating-segmented", name: "Floating split"},
@@ -19,6 +22,8 @@
   ];
   var draggingApp = null;
   var pointerSort = null;
+  var quickPointerSort = null;
+  var pendingFileLocation = null;
   var scheduled = false;
   var resolvingWidgets = false;
   var statusTimer = 0;
@@ -111,6 +116,18 @@
 
   function saveTaskbarOrder(shelf) {
     writeJson(ORDER_KEY, shelfReorderItems(shelf).map(shelfItemKey));
+  }
+
+  function clearInsertionGap(container) {
+    if (!container) return;
+    container.querySelectorAll(".aos-insert-before, .aos-insert-after").forEach(function (item) {
+      item.classList.remove("aos-insert-before", "aos-insert-after");
+    });
+  }
+
+  function showInsertionGap(container, target, before) {
+    clearInsertionGap(container);
+    if (target) target.classList.add(before ? "aos-insert-before" : "aos-insert-after");
   }
 
   function appFromLabel(label) {
@@ -340,6 +357,7 @@
     item.addEventListener("dragend", function () {
       item.classList.remove("aos-taskbar-dragging");
       document.querySelectorAll(".aos-taskbar-drop-target").forEach(function (item) { item.classList.remove("aos-taskbar-drop-target"); });
+      clearInsertionGap(shelf);
       saveTaskbarOrder(shelf);
       draggingApp = null;
     });
@@ -366,6 +384,7 @@
       var desktop = shelf.closest(".desktop");
       var vertical = desktop.classList.contains("shelf-left") || desktop.classList.contains("shelf-right");
       var before = vertical ? event.clientY < bounds.top + bounds.height / 2 : event.clientX < bounds.left + bounds.width / 2;
+      showInsertionGap(shelf, target, before);
       shelf.insertBefore(pointerSort.item, before ? target : target.nextSibling);
       return;
     }
@@ -384,6 +403,7 @@
     window.removeEventListener("pointercancel", finishPointerSort, true);
     if (current.active) {
       current.item.classList.remove("aos-taskbar-dragging", "aos-taskbar-pointer-dragging");
+      clearInsertionGap(current.shelf);
       current.item.dataset.aosSuppressClick = "true";
       saveTaskbarOrder(current.shelf);
       window.setTimeout(function () { delete current.item.dataset.aosSuppressClick; }, 120);
@@ -446,6 +466,7 @@
       var bounds = target.getBoundingClientRect();
       var vertical = shelf.closest(".desktop").classList.contains("shelf-left") || shelf.closest(".desktop").classList.contains("shelf-right");
       var before = vertical ? event.clientY < bounds.top + bounds.height / 2 : event.clientX < bounds.left + bounds.width / 2;
+      showInsertionGap(shelf, target, before);
       shelf.insertBefore(draggingApp.source, before ? target : target.nextSibling);
     });
     shelf.addEventListener("dragleave", function (event) {
@@ -458,7 +479,367 @@
       var destination = destinationForDrop(event.target);
       if (!completeSpecialDrop(destination)) saveTaskbarOrder(shelf);
       document.querySelectorAll(".aos-taskbar-drop-target").forEach(function (item) { item.classList.remove("aos-taskbar-drop-target"); });
+      clearInsertionGap(shelf);
     });
+  }
+
+  function quickTileKey(button) {
+    var label = button.querySelector("b");
+    return String(label ? label.textContent : button.getAttribute("aria-label") || "").trim().toLowerCase();
+  }
+
+  function quickTileButtons(grid) {
+    return Array.from(grid.children).filter(function (item) {
+      return item instanceof HTMLButtonElement && Boolean(quickTileKey(item));
+    });
+  }
+
+  function saveQuickTileOrder(grid) {
+    writeJson(QUICK_ORDER_KEY, quickTileButtons(grid).map(quickTileKey));
+  }
+
+  function applyQuickTileOrder(grid) {
+    var saved = readJson(QUICK_ORDER_KEY, []);
+    if (!Array.isArray(saved) || !saved.length) return;
+    var buttons = quickTileButtons(grid);
+    var original = new Map(buttons.map(function (button, index) { return [button, index]; }));
+    buttons.sort(function (first, second) {
+      var firstIndex = saved.indexOf(quickTileKey(first));
+      var secondIndex = saved.indexOf(quickTileKey(second));
+      if (firstIndex < 0) firstIndex = saved.length + original.get(first);
+      if (secondIndex < 0) secondIndex = saved.length + original.get(second);
+      return firstIndex - secondIndex;
+    });
+    var current = quickTileButtons(grid);
+    if (buttons.every(function (button, index) { return current[index] === button; })) return;
+    buttons.forEach(function (button) { grid.appendChild(button); });
+  }
+
+  function finishQuickPointerSort(event) {
+    if (!quickPointerSort || event.pointerId !== quickPointerSort.pointerId) return;
+    var current = quickPointerSort;
+    window.removeEventListener("pointermove", current.move, true);
+    window.removeEventListener("pointerup", finishQuickPointerSort, true);
+    window.removeEventListener("pointercancel", finishQuickPointerSort, true);
+    clearInsertionGap(current.grid);
+    if (current.active) {
+      current.item.classList.remove("aos-quick-tile-dragging");
+      current.item.dataset.aosSuppressQuickClick = "true";
+      saveQuickTileOrder(current.grid);
+      window.setTimeout(function () { delete current.item.dataset.aosSuppressQuickClick; }, 140);
+    }
+    quickPointerSort = null;
+  }
+
+  function bindQuickTile(button, grid) {
+    if (button.dataset.aosQuickDrag === "ready") return;
+    button.dataset.aosQuickDrag = "ready";
+    button.draggable = true;
+    button.addEventListener("dragstart", function (event) {
+      button.classList.add("aos-quick-tile-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/x-aos-quick-tile", quickTileKey(button));
+      grid.dataset.aosDraggingQuickTile = quickTileKey(button);
+    });
+    button.addEventListener("dragend", function () {
+      button.classList.remove("aos-quick-tile-dragging");
+      delete grid.dataset.aosDraggingQuickTile;
+      clearInsertionGap(grid);
+      saveQuickTileOrder(grid);
+    });
+    button.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0 || event.pointerType === "touch" && event.isPrimary === false) return;
+      var startX = event.clientX;
+      var startY = event.clientY;
+      quickPointerSort = {
+        item: button,
+        grid: grid,
+        pointerId: event.pointerId,
+        active: false,
+        move: function (moveEvent) {
+          if (!quickPointerSort || moveEvent.pointerId !== quickPointerSort.pointerId) return;
+          if (!quickPointerSort.active && Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < 7) return;
+          quickPointerSort.active = true;
+          button.classList.add("aos-quick-tile-dragging");
+          var target = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
+          target = target && target.closest && target.closest(".quick-tiles > button");
+          if (target && target !== button && target.parentElement === grid) {
+            var bounds = target.getBoundingClientRect();
+            var before = moveEvent.clientX < bounds.left + bounds.width / 2;
+            showInsertionGap(grid, target, before);
+            grid.insertBefore(button, before ? target : target.nextSibling);
+          }
+          moveEvent.preventDefault();
+        }
+      };
+      window.addEventListener("pointermove", quickPointerSort.move, true);
+      window.addEventListener("pointerup", finishQuickPointerSort, true);
+      window.addEventListener("pointercancel", finishQuickPointerSort, true);
+    });
+    button.addEventListener("click", function (event) {
+      if (button.dataset.aosSuppressQuickClick !== "true") return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
+  }
+
+  function installQuickTileSorting(grid) {
+    applyQuickTileOrder(grid);
+    quickTileButtons(grid).forEach(function (button) { bindQuickTile(button, grid); });
+    if (grid.dataset.aosQuickDrop === "ready") return;
+    grid.dataset.aosQuickDrop = "ready";
+    grid.addEventListener("dragover", function (event) {
+      if (!grid.dataset.aosDraggingQuickTile) return;
+      var source = quickTileButtons(grid).find(function (button) {
+        return quickTileKey(button) === grid.dataset.aosDraggingQuickTile;
+      });
+      var target = event.target.closest(".quick-tiles > button");
+      if (!source || !target || source === target) return;
+      event.preventDefault();
+      var bounds = target.getBoundingClientRect();
+      var before = event.clientX < bounds.left + bounds.width / 2;
+      showInsertionGap(grid, target, before);
+      grid.insertBefore(source, before ? target : target.nextSibling);
+    });
+    grid.addEventListener("drop", function (event) {
+      if (!grid.dataset.aosDraggingQuickTile) return;
+      event.preventDefault();
+      delete grid.dataset.aosDraggingQuickTile;
+      clearInsertionGap(grid);
+      saveQuickTileOrder(grid);
+    });
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, function (character) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[character];
+    });
+  }
+
+  function storedFiles() {
+    var files = readJson("aos-files", []);
+    return Array.isArray(files) ? files : [];
+  }
+
+  function findFilesWindow() {
+    return Array.from(document.querySelectorAll(".system-window")).find(function (windowElement) {
+      var title = windowElement.querySelector(":scope > header b, :scope > header strong");
+      return title && title.textContent.trim() === "Files";
+    });
+  }
+
+  function clickFilesPlace(root, names) {
+    var button = Array.from(root.querySelectorAll("button")).find(function (item) {
+      return names.indexOf(item.textContent.trim()) !== -1;
+    });
+    if (button) button.click();
+    return Boolean(button);
+  }
+
+  function fileFolderChain(folderId, files) {
+    var chain = [];
+    var current = folderId;
+    var safety = 0;
+    while (["home", "root", "documents", "downloads"].indexOf(current) === -1 && safety++ < 40) {
+      var folder = files.find(function (item) { return item && item.id === current && item.type === "folder"; });
+      if (!folder) break;
+      chain.unshift(folder);
+      current = folder.parent || "home";
+    }
+    return {base: current, chain: chain};
+  }
+
+  function performPendingFileNavigation(attempt) {
+    if (!pendingFileLocation) return;
+    var root = findFilesWindow();
+    if (!root || root.hidden || getComputedStyle(root).display === "none") {
+      if ((attempt || 0) < 18) window.setTimeout(function () { performPendingFileNavigation((attempt || 0) + 1); }, 120);
+      return;
+    }
+    var request = pendingFileLocation;
+    pendingFileLocation = null;
+    var files = storedFiles();
+    var route = fileFolderChain(request.folder || "home", files);
+    var baseNames = route.base === "root" ? ["OS", "Root"] : route.base === "documents" ? ["Documents"] : route.base === "downloads" ? ["Downloads"] : ["Home"];
+    clickFilesPlace(root, baseNames);
+    var index = 0;
+    function next() {
+      if (index < route.chain.length) {
+        var folder = route.chain[index++];
+        var button = Array.from(root.querySelectorAll("button")).find(function (item) {
+          var name = item.querySelector("b");
+          return name && name.textContent.trim() === folder.name;
+        });
+        if (button) button.dispatchEvent(new MouseEvent("dblclick", {bubbles: true, cancelable: true, view: window}));
+        window.setTimeout(next, 90);
+        return;
+      }
+      if (request.fileId) {
+        var file = files.find(function (item) { return item && item.id === request.fileId; });
+        if (file) {
+          var fileButton = Array.from(root.querySelectorAll("button")).find(function (item) {
+            var name = item.querySelector("b");
+            return name && name.textContent.trim() === file.name;
+          });
+          if (fileButton) fileButton.click();
+        }
+      }
+    }
+    window.setTimeout(next, 100);
+  }
+
+  function openFilesLocation(folder, fileId) {
+    pendingFileLocation = {folder: folder || "home", fileId: fileId || ""};
+    writeJson(FILES_LAST_LOCATION_KEY, pendingFileLocation);
+    var root = findFilesWindow();
+    var filesButton = appFromLabel("Files");
+    if (!root || root.hidden || getComputedStyle(root).display === "none") {
+      if (filesButton) filesButton.click();
+    }
+    window.setTimeout(function () { performPendingFileNavigation(0); }, 80);
+  }
+
+  function resolveFilesAddress(address) {
+    var parts = String(address || "").replace(/\\/g, "/").trim().split("/").filter(Boolean);
+    var usersIndex = parts.findIndex(function (part) { return part.toLowerCase() === "users"; });
+    if (usersIndex >= 0) parts = parts.slice(usersIndex + 2);
+    if (!parts.length) return {folder: "home", fileId: ""};
+    var first = parts.shift().toLowerCase();
+    var known = ["home", "os", "root", "documents", "downloads"];
+    var current = first === "os" || first === "root" ? "root" : first === "documents" ? "documents" : first === "downloads" ? "downloads" : "home";
+    if (known.indexOf(first) === -1) parts.unshift(first);
+    var files = storedFiles();
+    var fileId = "";
+    parts.forEach(function (part, index) {
+      var choices = current === "home" ? ["root", "documents", "downloads"] : [current];
+      var match = files.find(function (item) {
+        return item && choices.indexOf(item.parent) !== -1 && String(item.name).toLowerCase() === part.toLowerCase();
+      }) || files.find(function (item) { return item && String(item.name).toLowerCase() === part.toLowerCase(); });
+      if (!match) return;
+      if (match.type === "folder") current = match.id;
+      else if (index === parts.length - 1) { fileId = match.id; current = match.parent || current; }
+    });
+    return {folder: current, fileId: fileId};
+  }
+
+  function handleFilesNavigate(event) {
+    var detail = event.detail || {};
+    if (detail.path && !detail.folder) detail = resolveFilesAddress(detail.path);
+    openFilesLocation(detail.folder || "home", detail.fileId || "");
+  }
+
+  function renderQuickFilePins(section) {
+    var pins = readJson(QUICK_FILE_PINS_KEY, []);
+    if (!Array.isArray(pins)) pins = [];
+    var files = storedFiles();
+    var signature = JSON.stringify(pins) + ":" + files.map(function (file) {
+      return file.id + ":" + file.name + ":" + file.parent;
+    }).join("|");
+    if (section.dataset.aosPinsSignature === signature) return;
+    section.dataset.aosPinsSignature = signature;
+    var pinned = pins.map(function (id) {
+      return files.find(function (file) { return file && file.id === id; });
+    }).filter(Boolean);
+    section.innerHTML = '<header><span><b>File pins</b><small>Open files and folders at their location</small></span><button type="button" data-aqs-add-pin aria-label="Add a file pin">+</button></header>' +
+      '<div class="aos-quick-file-pin-list">' + (pinned.length ? pinned.map(function (file) {
+        var icon = file.icon && file.icon.indexOf("data:") === 0 ? file.icon : "./assets/icons/" + encodeURIComponent(file.icon || (file.type === "folder" ? "Files.png" : "Unnamed app.png"));
+        return '<div class="aos-quick-file-pin"><button type="button" data-aqs-open-pin="' + escapeHtml(file.id) + '"><img src="' + escapeHtml(icon) + '" alt=""><span><b>' + escapeHtml(file.name) + '</b><small>' + (file.type === "folder" ? "Folder" : "File") + '</small></span></button><button type="button" data-aqs-remove-pin="' + escapeHtml(file.id) + '" aria-label="Remove ' + escapeHtml(file.name) + '">×</button></div>';
+      }).join("") : '<p>No file pins yet.</p>') + '</div><div class="aos-quick-file-picker" hidden></div>';
+  }
+
+  function renderQuickFilePicker(section) {
+    var picker = section.querySelector(".aos-quick-file-picker");
+    if (!picker) return;
+    var pins = readJson(QUICK_FILE_PINS_KEY, []);
+    if (!Array.isArray(pins)) pins = [];
+    var files = storedFiles().filter(function (file) {
+      return file && pins.indexOf(file.id) === -1;
+    }).slice(0, 24);
+    picker.innerHTML = '<b>Choose a file or folder</b>' + (files.length ? files.map(function (file) {
+      return '<button type="button" data-aqs-pick-pin="' + escapeHtml(file.id) + '"><span>' + (file.type === "folder" ? "Folder" : "File") + '</span><b>' + escapeHtml(file.name) + '</b></button>';
+    }).join("") : '<p>Everything is already pinned.</p>');
+  }
+
+  function installQuickFilePins(quick) {
+    var tiles = quick.querySelector(".quick-tiles");
+    if (!tiles) return;
+    var section = quick.querySelector(".aos-quick-file-pins");
+    if (!section) {
+      section = document.createElement("section");
+      section.className = "aos-quick-file-pins";
+      tiles.insertAdjacentElement("afterend", section);
+      section.addEventListener("click", function (event) {
+        var add = event.target.closest("[data-aqs-add-pin]");
+        var open = event.target.closest("[data-aqs-open-pin]");
+        var remove = event.target.closest("[data-aqs-remove-pin]");
+        var pick = event.target.closest("[data-aqs-pick-pin]");
+        if (add) {
+          var picker = section.querySelector(".aos-quick-file-picker");
+          renderQuickFilePicker(section);
+          picker.hidden = !picker.hidden;
+        } else if (open) {
+          var file = storedFiles().find(function (item) { return item && item.id === open.dataset.aqsOpenPin; });
+          if (file) openFilesLocation(file.type === "folder" ? file.id : file.parent, file.type === "file" ? file.id : "");
+        } else if (remove || pick) {
+          var pins = readJson(QUICK_FILE_PINS_KEY, []);
+          if (!Array.isArray(pins)) pins = [];
+          if (remove) pins = pins.filter(function (id) { return id !== remove.dataset.aqsRemovePin; });
+          if (pick && pins.indexOf(pick.dataset.aqsPickPin) === -1) pins.push(pick.dataset.aqsPickPin);
+          writeJson(QUICK_FILE_PINS_KEY, pins.slice(0, 8));
+          delete section.dataset.aosPinsSignature;
+          renderQuickFilePins(section);
+        }
+      });
+    }
+    renderQuickFilePins(section);
+  }
+
+  function enhanceQuickSettings() {
+    document.querySelectorAll(".quick").forEach(function (quick) {
+      var grid = quick.querySelector(".quick-tiles");
+      if (grid) installQuickTileSorting(grid);
+      installQuickFilePins(quick);
+    });
+  }
+
+  function enhanceFilesWindow() {
+    var root = findFilesWindow();
+    if (!root) return;
+    var pathSpan = Array.from(root.querySelectorAll("span")).find(function (span) {
+      return /^[A-Z]:\/\//i.test(span.textContent.trim());
+    });
+    if (!pathSpan) return;
+    var bar = pathSpan.parentElement;
+    if (!bar) return;
+    bar.classList.add("aos-files-location-bar");
+    var input = bar.querySelector(".aos-files-location-input");
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "text";
+      input.className = "aos-files-location-input";
+      input.setAttribute("aria-label", "File location");
+      input.spellcheck = false;
+      input.addEventListener("keydown", function (event) {
+        if (event.key !== "Enter") return;
+        event.preventDefault();
+        var resolved = resolveFilesAddress(input.value);
+        openFilesLocation(resolved.folder, resolved.fileId);
+      });
+      input.addEventListener("focus", function () { input.select(); });
+      bar.appendChild(input);
+    }
+    if (document.activeElement !== input && input.value !== pathSpan.textContent.trim()) input.value = pathSpan.textContent.trim();
+    var current = resolveFilesAddress(pathSpan.textContent.trim());
+    if (root.dataset.aosFilesLocationReady !== "true") {
+      root.dataset.aosFilesLocationReady = "true";
+      var saved = readJson(FILES_LAST_LOCATION_KEY, null);
+      if (saved && saved.folder && current.folder === "home" && saved.folder !== "home") {
+        pendingFileLocation = saved;
+        window.setTimeout(function () { performPendingFileNavigation(0); }, 80);
+        return;
+      }
+    }
+    writeJson(FILES_LAST_LOCATION_KEY, current);
   }
 
   function installDesktopDrop(desktop) {
@@ -809,6 +1190,8 @@
     applyPreferences();
     addSettingsControls();
     enhanceBrowserPins();
+    enhanceQuickSettings();
+    enhanceFilesWindow();
     bindWidgetLayer();
     positionTaskbarOverlays();
   }
@@ -823,6 +1206,9 @@
   }
 
   document.addEventListener("dblclick", openAosLink, true);
+  window.addEventListener("aos-files-navigate", handleFilesNavigate);
+  window.addEventListener("aos-files-open-location", handleFilesNavigate);
+  window.addEventListener("aos-files-change", scheduleEnhance);
   document.addEventListener("click", function (event) {
     var control = event.target.closest && event.target.closest(".shelf > .search-pill, .shelf > .status, .shelf > [aria-label='AI shortcut'], .shelf > .shelf-bird");
     if (!control) return;
@@ -834,7 +1220,7 @@
   new MutationObserver(scheduleEnhance).observe(document.documentElement, {childList: true, subtree: true});
   window.addEventListener("resize", function () { applyPreferences(); resolveWidgets(); positionTaskbarOverlays(); });
   window.addEventListener("storage", function (event) {
-    if ([LAYOUT_KEY, SIZE_KEY, ORDER_KEY, SHORTCUTS_KEY, BROWSER_PINS_KEY].indexOf(event.key) !== -1) scheduleEnhance();
+    if ([LAYOUT_KEY, SIZE_KEY, ORDER_KEY, SHORTCUTS_KEY, BROWSER_PINS_KEY, QUICK_ORDER_KEY, QUICK_FILE_PINS_KEY, FILES_LAST_LOCATION_KEY].indexOf(event.key) !== -1) scheduleEnhance();
   });
   statusTimer = window.setInterval(function () {
     document.querySelectorAll(".shelf > .status").forEach(updateStatus);

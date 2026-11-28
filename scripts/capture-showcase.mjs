@@ -200,6 +200,11 @@ async function main() {
 
   await evaluate("document.querySelector('.shelf > .status').click()");
   await waitFor("Boolean(document.querySelector('.quick')) && getComputedStyle(document.querySelector('.quick')).display !== 'none'", "Quick Settings");
+  const quickSettingsReady = await evaluate(`(() => ({
+    movableTiles: document.querySelectorAll('.quick-tiles > [data-aos-quick-drag="ready"]').length,
+    filePins: Boolean(document.querySelector('.quick .aos-quick-file-pins'))
+  }))()`);
+  if (quickSettingsReady.movableTiles < 3 || !quickSettingsReady.filePins) throw new Error("Quick Settings customisation did not initialise.");
   await capture("03-quick-settings");
   await evaluate("document.querySelector('.shelf > .status').click()");
   await dismissPanels();
@@ -227,6 +232,21 @@ async function main() {
   })()`);
 
   await clickApp("Files");
+  await waitFor("Boolean(document.querySelector('.system-window .aos-files-location-input'))", "the editable Files location bar");
+  await evaluate(`(() => {
+    const input = document.querySelector('.system-window .aos-files-location-input');
+    input.value = 'C://Users/Showcase/Downloads';
+    input.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', bubbles:true}));
+  })()`);
+  await waitFor("/\\/Downloads$/i.test(document.querySelector('.system-window .aos-files-location-input').value)", "typed Files navigation");
+  const searchFileLocation = await evaluate(`(() => {
+    const files = JSON.parse(localStorage.getItem('aos-files') || '[]');
+    const file = files.find((item) => item && item.type === 'file' && item.parent === 'documents');
+    if (!file) return false;
+    window.dispatchEvent(new CustomEvent('aos-files-open-location', {detail:{folder:file.parent,fileId:file.id}}));
+    return true;
+  })()`);
+  if (searchFileLocation) await waitFor("/\\/Documents$/i.test(document.querySelector('.system-window .aos-files-location-input').value)", "a file's real Files location");
   await clickApp("Settings");
   await capture("07-windows");
 
@@ -234,6 +254,8 @@ async function main() {
   await capture("08-store");
 
   await clickApp("FileDrop");
+  const obsoleteFileDropBanner = await evaluate("document.body.textContent.includes('No app or EXE needed')");
+  if (obsoleteFileDropBanner) throw new Error("The obsolete FileDrop install banner is still visible.");
   await capture("09-filedrop");
 
   cdp.socket.close();

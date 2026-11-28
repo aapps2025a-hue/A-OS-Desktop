@@ -102,7 +102,13 @@
         name: file.name || "Untitled",
         detail: file.parent === "root" ? "Desktop" : (file.parent || "A-OS Files"),
         icon: file.icon && /^(data:|https?:)/i.test(file.icon) ? file.icon : asset(file.icon || (file.type === "folder" ? "Files.png" : "Text Editor.png")),
-        action: function () { openApp("Files"); }
+        action: function () {
+          window.dispatchEvent(new CustomEvent("aos-files-open-location", {detail: {
+            folder: file.type === "folder" ? file.id : (file.parent || "home"),
+            fileId: file.type === "file" ? file.id : ""
+          }}));
+          closeSearchUnlessPinned();
+        }
       };
     }) : [];
   }

@@ -249,9 +249,6 @@
     var transfers = (state.transfers || []).filter(function (item) { return item.state !== "pending"; }).slice(0, 8);
 
     var html = "";
-    if (state.browserMode) {
-      html += '<section class="aos-filedrop-offline aos-filedrop-browser-mode"><div><img src="' + ICON + '" alt=""><h2>No app or EXE needed</h2><p>Open A-OS FileDrop in a browser on the other device and sign in with the same A-Applications account. Incoming files are saved in Downloads.</p></div><button type="button" class="aos-filedrop-primary" data-fd-upload>Upload from this device</button></section>';
-    }
     if (pending.length) {
       html += '<section class="aos-filedrop-section"><header><h3>Waiting for you</h3><small>Accept only files you expect</small></header><div class="aos-filedrop-incoming">';
       pending.forEach(function (item) {

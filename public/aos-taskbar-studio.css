@@ -27,6 +27,13 @@
   opacity: .62;
 }
 .desktop .shelf > .aos-taskbar-pointer-dragging { z-index: 20; cursor: grabbing !important; transform: scale(.97); }
+.desktop .shelf > [data-aos-taskbar-drag="ready"] { transition: margin 120ms ease, transform 120ms ease, opacity 120ms ease; }
+.desktop .shelf > .aos-insert-before { margin-left: 14px !important; }
+.desktop .shelf > .aos-insert-after { margin-right: 14px !important; }
+.desktop.shelf-left .shelf > .aos-insert-before,
+.desktop.shelf-right .shelf > .aos-insert-before { margin-left: 0 !important; margin-top: 14px !important; }
+.desktop.shelf-left .shelf > .aos-insert-after,
+.desktop.shelf-right .shelf > .aos-insert-after { margin-right: 0 !important; margin-bottom: 14px !important; }
 
 .desktop .shelf .launcher-button,
 .desktop .shelf .shelf-icon,
@@ -192,6 +199,41 @@
 
 .aos-taskbar-dragging { opacity: .45 !important; filter: saturate(.55); }
 .aos-taskbar-drop-target { outline: 2px solid #22a5e5 !important; outline-offset: 2px; }
+
+.quick-tiles > .aos-quick-tile-dragging { opacity: .5; transform: scale(.96); }
+.quick-tiles > [data-aos-quick-drag="ready"] { cursor: grab; transition: margin 120ms ease, transform 120ms ease, opacity 120ms ease; }
+.quick-tiles > [data-aos-quick-drag="ready"]:active { cursor: grabbing; }
+.quick-tiles > .aos-insert-before { margin-left: 14px !important; }
+.quick-tiles > .aos-insert-after { margin-right: 14px !important; }
+
+.aos-quick-file-pins { display: grid; gap: 8px; padding: 10px 12px; border-top: 1px solid #7892a233; }
+.aos-quick-file-pins > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.aos-quick-file-pins > header > span { display: grid; min-width: 0; }
+.aos-quick-file-pins > header b { font-size: 12px; }
+.aos-quick-file-pins > header small { color: #657b88; font-size: 9px; }
+.aos-quick-file-pins > header > button { width: 28px; height: 28px; border: 0; border-radius: 7px; background: #147fbd; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
+.aos-quick-file-pin-list { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.aos-quick-file-pin-list > p { margin: 3px 0; color: #718590; font-size: 10px; }
+.aos-quick-file-pin { position: relative; flex: 0 0 118px; display: flex; min-width: 0; border: 1px solid #b8cbd5; border-radius: 7px; overflow: hidden; background: #fff; }
+.aos-quick-file-pin > [data-aqs-open-pin] { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; padding: 7px 4px 7px 7px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.aos-quick-file-pin img { width: 24px; height: 24px; object-fit: contain; flex: none; }
+.aos-quick-file-pin span { display: grid; min-width: 0; }
+.aos-quick-file-pin span b,.aos-quick-file-pin span small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aos-quick-file-pin span b { font-size: 9px; color: #223847; }
+.aos-quick-file-pin span small { font-size: 8px; color: #718590; }
+.aos-quick-file-pin > [data-aqs-remove-pin] { width: 22px; border: 0; border-left: 1px solid #d6e1e7; background: #eef4f7; color: #597180; cursor: pointer; }
+.aos-quick-file-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; max-height: 164px; overflow-y: auto; padding: 7px; border: 1px solid #adbec8; border-radius: 7px; background: #f4f8fa; }
+.aos-quick-file-picker[hidden] { display: none; }
+.aos-quick-file-picker > b,.aos-quick-file-picker > p { grid-column: 1 / -1; margin: 0; font-size: 10px; }
+.aos-quick-file-picker > button { display: grid; min-width: 0; padding: 6px 7px; border: 1px solid #c7d6de; border-radius: 6px; background: #fff; color: #263e4c; text-align: left; cursor: pointer; }
+.aos-quick-file-picker > button span { color: #6b818d; font-size: 8px; text-transform: uppercase; }
+.aos-quick-file-picker > button b { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+
+.aos-files-location-bar { position: relative; min-height: 30px; padding: 0 !important; overflow: hidden; }
+.aos-files-location-bar > span { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
+.aos-files-location-input { width: 100%; min-width: 0; height: 30px; padding: 0 12px; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.aos-files-location-input:focus { background: #fff; box-shadow: inset 0 0 0 2px #168bd0; }
+.dark-mode .aos-files-location-input:focus { background: #142436; }
 
 .aos-taskbar-anchored-overlay {
   z-index: 2147481800 !important;
